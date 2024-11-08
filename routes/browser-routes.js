@@ -10,10 +10,10 @@ const stagehandService = require('../services/stagehand-service');
  * 
  * @apiDescription Navigates the browser to a specified URL.
  * 
- * @apiParam (Path) {String} sessionId Session's unique identifier
- * @apiParam (Request Body) {String} url URL to navigate to
+ * @apiParam {String} sessionId Session's unique identifier
+ * @apiBody {String} url URL to navigate to
  * 
- * @apiParamExample {json} Request Body Example:
+ * @apiParamExample {json} Request Example:
  *     {
  *       "url": "https://example.com"
  *     }
@@ -48,11 +48,11 @@ router.post('/navigate/:sessionId', async (req, res) => {
  * 
  * @apiDescription Performs a natural language action in the browser.
  * 
- * @apiParam (Path) {String} sessionId Session's unique identifier
- * @apiParam (Request Body) {String} action Natural language action to perform
- * @apiParam (Request Body) {Object} [options] Additional action options
+ * @apiParam {String} sessionId Session's unique identifier
+ * @apiBody {String} action Natural language action to perform
+ * @apiBody {Object} [options] Additional action options
  * 
- * @apiParamExample {json} Request Body Example:
+ * @apiParamExample {json} Request Example:
  *     {
  *       "action": "Click the submit button",
  *       "options": {
@@ -95,10 +95,10 @@ router.post('/act/:sessionId', async (req, res) => {
  * 
  * @apiDescription Extracts structured data from the current page.
  * 
- * @apiParam (Path) {String} sessionId Session's unique identifier
- * @apiParam (Request Body) {Object} schema Data extraction schema
+ * @apiParam {String} sessionId Session's unique identifier
+ * @apiBody {Object} schema Data extraction schema
  * 
- * @apiParamExample {json} Request Body Example:
+ * @apiParamExample {json} Request Example:
  *     {
  *       "schema": {
  *         "title": "h1",
@@ -139,7 +139,7 @@ router.post('/extract/:sessionId', async (req, res) => {
  * 
  * @apiDescription Gets possible actions and page state observations.
  * 
- * @apiParam (Path) {String} sessionId Session's unique identifier
+ * @apiParam {String} sessionId Session's unique identifier
  * 
  * @apiSuccess {Boolean} success Indicates if operation was successful
  * @apiSuccess {Object} observations Page observations
