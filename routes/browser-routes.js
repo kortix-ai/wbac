@@ -13,20 +13,8 @@ const stagehandService = require('../services/stagehand-service');
  * @apiParam {String} sessionId Session's unique identifier
  * @apiBody {String} url URL to navigate to
  * 
- * @apiParamExample {json} Request Example:
- *     {
- *       "url": "https://example.com"
- *     }
- * 
  * @apiSuccess {Boolean} success Indicates if operation was successful
  * @apiSuccess {String} currentUrl Current browser URL after navigation
- * 
- * @apiSuccessExample {json} Success Response:
- *     HTTP/1.1 200 OK
- *     {
- *       "success": true,
- *       "currentUrl": "https://example.com"
- *     }
  * 
  * @apiError (Error 500) {Object} error Error object with message
  */
@@ -50,30 +38,10 @@ router.post('/navigate/:sessionId', async (req, res) => {
  * 
  * @apiParam {String} sessionId Session's unique identifier
  * @apiBody {String} action Natural language action to perform
- * @apiBody {Object} [options] Additional action options
- * 
- * @apiParamExample {json} Request Example:
- *     {
- *       "action": "Click the submit button",
- *       "options": {
- *         "timeout": 5000,
- *         "force": false
- *       }
- *     }
+ * @apiBody {Object} options Additional action options
  * 
  * @apiSuccess {Boolean} success Indicates if operation was successful
  * @apiSuccess {Object} result Action result details
- * 
- * @apiSuccessExample {json} Success Response:
- *     HTTP/1.1 200 OK
- *     {
- *       "success": true,
- *       "result": {
- *         "action": "click",
- *         "target": "Submit button",
- *         "status": "completed"
- *       }
- *     }
  * 
  * @apiError (Error 500) {Object} error Error object with message
  */
@@ -98,26 +66,8 @@ router.post('/act/:sessionId', async (req, res) => {
  * @apiParam {String} sessionId Session's unique identifier
  * @apiBody {Object} schema Data extraction schema
  * 
- * @apiParamExample {json} Request Example:
- *     {
- *       "schema": {
- *         "title": "h1",
- *         "items": ".item-list li"
- *       }
- *     }
- * 
  * @apiSuccess {Boolean} success Indicates if operation was successful
  * @apiSuccess {Object} data Extracted structured data
- * 
- * @apiSuccessExample {json} Success Response:
- *     HTTP/1.1 200 OK
- *     {
- *       "success": true,
- *       "data": {
- *         "title": "Page Title",
- *         "items": ["item1", "item2"]
- *       }
- *     }
  * 
  * @apiError (Error 500) {Object} error Error object with message
  */
@@ -144,20 +94,6 @@ router.post('/extract/:sessionId', async (req, res) => {
  * @apiSuccess {Boolean} success Indicates if operation was successful
  * @apiSuccess {Object} observations Page observations
  * @apiSuccess {String[]} possibleActions List of possible actions
- * 
- * @apiSuccessExample {json} Success Response:
- *     HTTP/1.1 200 OK
- *     {
- *       "success": true,
- *       "observations": {
- *         "title": "Current Page",
- *         "clickableElements": ["button1", "link2"]
- *       },
- *       "possibleActions": [
- *         "Click Submit button",
- *         "Fill login form"
- *       ]
- *     }
  * 
  * @apiError (Error 500) {Object} error Error object with message
  */

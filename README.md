@@ -39,6 +39,7 @@ Built on top of:
 - Error tracking
 - Screenshot capture
 - DOM state inspection
+
 ## Getting Started
 
 ### Prerequisites
