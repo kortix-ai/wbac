@@ -24,8 +24,7 @@ class BrowserbaseService {
         try {
             const session = await this.client.sessions.create({
                 projectId: this.projectId,
-                keepAlive: true,
-                timeout: 60
+                keepAlive: true
             });
             return session;
         } catch (error) {
