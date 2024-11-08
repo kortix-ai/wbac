@@ -1,0 +1,17 @@
+{
+  "name": "web-browser-ai-control",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@browserbasehq/sdk": "^2.0.0", 
+    "@browserbasehq/stagehand": "^1.0.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "nodemon": "^3.1.7",
+    "playwright-core": "^1.48.2",
+    "zod": "^3.23.8"
+  }
+}
