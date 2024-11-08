@@ -1,6 +1,6 @@
 # Web Browser AI-Control API Server
 
-A hosted API server for AI agents to control web browsers in the cloud using [Browserbase](https://www.browserbase.com/) and [Stagehand](https://github.com/browserbase/stagehand).
+A hosted API server for AI agents to control web browsers in the cloud using [Browserbase](https://www.browserbase.com/), [Stagehand](https://github.com/browserbase/stagehand), and [Playwright](https://playwright.dev/).
 
 ## Overview
 
@@ -10,10 +10,12 @@ This server provides a REST API for AI agents to:
 - Extract structured data from web pages
 - Monitor browser activity and errors
 - Take screenshots and inspect DOM state
+- Execute custom Playwright automation scripts
 
 Built on top of:
 - [Browserbase](https://www.browserbase.com/) for cloud browser infrastructure
 - [Stagehand](https://github.com/browserbase/stagehand) for AI-powered browser control
+- [Playwright](https://playwright.dev/) for low-level browser automation
 - Express.js for the API server
 
 ## Key Features
@@ -30,13 +32,13 @@ Built on top of:
 - Page observation via `observe()`
 - Vision-based interaction support
 
+
 ### Monitoring & Debugging
 - Console log monitoring
 - Network request/response logging
 - Error tracking
 - Screenshot capture
 - DOM state inspection
-
 ## Getting Started
 
 ### Prerequisites
@@ -48,8 +50,8 @@ Built on top of:
 ### Installation
 
 ```
-git clone <repository-url>
-cd web-browser-ai-control
+git clone https://github.com/kortix-ai/web-browser-ai-control-server.git
+cd web-browser-ai-control-server
 npm install
 ```
 
@@ -121,3 +123,4 @@ MIT License - see LICENSE file for details
 
 - [Browserbase](https://www.browserbase.com/) for cloud browser infrastructure
 - [Stagehand](https://github.com/browserbase/stagehand) for AI browser control capabilities
+- [Playwright](https://playwright.dev/) for powerful browser automation
