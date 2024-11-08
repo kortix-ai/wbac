@@ -25,6 +25,7 @@ Built on top of:
 - `POST /api/sessions/create-session` - Create new browser session
 - `POST /api/sessions/stop-session/:sessionId` - Stop session
 - `GET /api/sessions/running-sessions` - List active sessions
+- `GET /api/sessions/session/:sessionId` - Get session information
 
 ### Browser Control
 

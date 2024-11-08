@@ -45,6 +45,16 @@ class BrowserbaseService {
             throw error;
         }
     }
+
+    async getSession(sessionId) {
+        try {
+            const session = await this.client.sessions.retrieve(sessionId);
+            return session;
+        } catch (error) {
+            console.error('Error retrieving Browserbase session:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = new BrowserbaseService(); 

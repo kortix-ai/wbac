@@ -79,4 +79,34 @@ router.get('/running-sessions', async (req, res) => {
     }
 });
 
+/**
+ * @api {get} /api/sessions/session/:sessionId Get Session Details
+ * @apiName GetSession
+ * @apiGroup Sessions
+ * @apiVersion 1.0.0
+ * 
+ * @apiDescription Retrieves details for a specific Browserbase session.
+ * 
+ * @apiParam {String} sessionId Session's unique identifier
+ * 
+ * @apiSuccess {Object} session Session details
+ * @apiSuccess {Boolean} success Operation success status
+ * 
+ * @apiError (Error 500) {Object} error Error object with message
+ */
+router.get('/session/:sessionId', async (req, res) => {
+    try {
+        const session = await browserbaseService.getSession(req.params.sessionId);
+        res.json({
+            success: true,
+            session
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 module.exports = router; 

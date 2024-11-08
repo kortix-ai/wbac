@@ -106,6 +106,10 @@ def get_running_sessions():
     response = requests.get(f"{API_URL}/sessions/running-sessions")
     return response.json()
 
+def get_session_details(session_id):
+    response = requests.get(f"{API_URL}/sessions/session/{session_id}")
+    return response.json()
+
 def main():
     st.title("Stagehand Web Browser Control")
     
@@ -189,9 +193,24 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"Error creating session: {str(e)}")
     
-    # Display active session info
+    # Display selected session info
     if st.session_state.session_id:
-        st.sidebar.success(f"Active Session: {st.session_state.session_id}")
+        st.sidebar.success(f"Selected Session: {st.session_state.session_id}")
+        
+        # Add session details
+        try:
+            session_details = get_session_details(st.session_state.session_id)
+            if session_details.get('success'):
+                session = session_details['session']
+                st.sidebar.markdown("### Session Details")
+                st.sidebar.markdown(f"""
+                    - **Status**: {session.get('status')}
+                    - **Region**: {session.get('region')}
+                    - **Created**: {session.get('createdAt')}
+                    - **Last Updated**: {session.get('updatedAt')}
+                """)
+        except Exception as e:
+            st.sidebar.error(f"Error fetching session details: {str(e)}")
         
         # Display Browserbase and debug URLs in sidebar
         browserbase_url = f"https://www.browserbase.com/sessions/{st.session_state.session_id}"
