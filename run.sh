@@ -2,7 +2,7 @@
 
 # Start the server and UI
 echo "Starting Stagehand server..."
-nodemon index.js &
+npm run dev &
 SERVER_PID=$!
 
 echo "Starting Streamlit UI..."
