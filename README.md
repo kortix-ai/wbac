@@ -18,6 +18,29 @@ Built on top of:
 - [Playwright](https://playwright.dev/) for low-level browser automation
 - Express.js for the API server
 
+## API Reference
+
+### Session Management
+
+- `POST /api/sessions/create-session` - Create new browser session
+- `POST /api/sessions/stop-session/:sessionId` - Stop session
+- `GET /api/sessions/running-sessions` - List active sessions
+
+### Browser Control
+
+- `POST /api/browser/navigate/:sessionId` - Navigate to URL
+- `POST /api/browser/act/:sessionId` - Perform action via natural language
+- `POST /api/browser/extract/:sessionId` - Extract structured data
+- `POST /api/browser/observe/:sessionId` - Get possible actions
+
+### Monitoring
+
+- `GET /api/browser/console-logs/:sessionId` - Get console logs
+- `GET /api/browser/network-logs/:sessionId` - Get network logs
+- `GET /api/browser/dom-state/:sessionId` - Get DOM state
+- `POST /api/browser/screenshot/:sessionId` - Take screenshot
+- `POST /api/browser/clear-logs/:sessionId` - Clear logs
+
 ## Key Features
 
 ### Browser Session Management
@@ -72,29 +95,6 @@ ANTHROPIC_API_KEY=your_anthropic_key
 ```
 npm start
 ```
-
-## API Reference
-
-### Session Management
-
-- `POST /api/sessions/create-session` - Create new browser session
-- `POST /api/sessions/stop-session/:sessionId` - Stop session
-- `GET /api/sessions/running-sessions` - List active sessions
-
-### Browser Control
-
-- `POST /api/browser/navigate/:sessionId` - Navigate to URL
-- `POST /api/browser/act/:sessionId` - Perform action via natural language
-- `POST /api/browser/extract/:sessionId` - Extract structured data
-- `POST /api/browser/observe/:sessionId` - Get possible actions
-
-### Monitoring
-
-- `GET /api/browser/console-logs/:sessionId` - Get console logs
-- `GET /api/browser/network-logs/:sessionId` - Get network logs
-- `GET /api/browser/dom-state/:sessionId` - Get DOM state
-- `POST /api/browser/screenshot/:sessionId` - Take screenshot
-- `POST /api/browser/clear-logs/:sessionId` - Clear logs
 
 ## UI Interface
 
