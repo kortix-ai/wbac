@@ -20,116 +20,30 @@ Built on top of:
 
 ## API Reference
 
+For complete API documentation, visit [wbac-api-docs.netlify.app](https://wbac-api-docs.netlify.app/)
+
 ### Session Management
 
 - `POST /api/sessions/create-session` - Create new browser session
-  - Returns session ID for the created browser instance
-  - No request body required
-
-- `POST /api/sessions/stop-session/:sessionId` - Stop and cleanup session
-  - Stops browser session and cleans up resources
-  - Requires session ID in URL
-
+- `POST /api/sessions/stop-session/:sessionId` - Stop session
 - `GET /api/sessions/running-sessions` - List active sessions
-  - Returns array of running session objects with ID, creation time, region and status
-
 - `GET /api/sessions/session/:sessionId` - Get session information
-  - Returns detailed information about specific session
-
 - `GET /api/sessions/debug/:sessionId` - Get session debug URLs
-  - Returns debugger URLs, WebSocket URL and page information
 
 ### Browser Control
 
 - `POST /api/browser/navigate/:sessionId` - Navigate to URL
-  - Body: `{ url: string }`
-  - Navigates browser to specified URL with network idle waiting
-
 - `POST /api/browser/act/:sessionId` - Perform action via natural language
-  - Body: 
-    ```js
-    {
-      action: string,          // Natural language action to perform
-      useVision?: string,      // Vision mode ('fallback' by default)
-      modelName?: string,      // Optional AI model name
-      includeLogs?: boolean,   // Include execution logs
-      logFilters?: {          // Optional log filtering
-        console?: {...},       // Console log filters
-        network?: {...}        // Network log filters
-      }
-    }
-    ```
-
 - `POST /api/browser/extract/:sessionId` - Extract structured data
-  - Body:
-    ```js
-    {
-      instruction: string,   // Natural language instruction
-      schema: object,       // Zod schema definition
-      modelName?: string    // Optional AI model name
-    }
-    ```
-
 - `POST /api/browser/observe/:sessionId` - Get possible actions
-  - Body:
-    ```js
-    {
-      instruction?: string,  // Optional guidance instruction
-      useVision?: string,   // Vision mode ('fallback' by default)
-      modelName?: string    // Optional AI model name
-    }
-    ```
 
-### Monitoring & Debugging
-
-- `POST /api/browser/screenshot/:sessionId` - Take screenshot
-  - Returns JPEG image of current page state
-  - No request body required
-
-- `GET /api/browser/dom-state/:sessionId` - Get DOM state
-  - Returns current page HTML structure
-  - No request body required
+### Monitoring
 
 - `GET /api/browser/console-logs/:sessionId` - Get console logs
-  - Query parameters:
-    ```js
-    {
-      levels?: {              // Log level filters
-        error?: boolean,      // Include errors (default: true)
-        warning?: boolean,    // Include warnings (default: false)
-        info?: boolean,       // Include info (default: false)
-        trace?: boolean       // Include trace (default: false)
-      },
-      includeStringFilters?: string[],  // Strings to include
-      excludeStringFilters?: string[],  // Strings to exclude
-      startTime?: string,               // ISO timestamp start
-      endTime?: string,                 // ISO timestamp end
-      truncateLength?: number           // Max message length
-    }
-    ```
-
 - `GET /api/browser/network-logs/:sessionId` - Get network logs
-  - Query parameters:
-    ```js
-    {
-      includeHeaders?: boolean,     // Include headers (default: false)
-      includeBody?: boolean,        // Include bodies (default: true)
-      includeInfo?: boolean,        // 1xx responses (default: true)
-      includeSuccess?: boolean,     // 2xx responses (default: true)
-      includeRedirect?: boolean,    // 3xx responses (default: true)
-      includeClientError?: boolean, // 4xx responses (default: true)
-      includeServerError?: boolean, // 5xx responses (default: true)
-      includeStringFilters?: string[],
-      excludeStringFilters?: string[],
-      startTime?: string,
-      endTime?: string,
-      truncateLength?: number
-    }
-    ```
-
+- `GET /api/browser/dom-state/:sessionId` - Get DOM state
+- `POST /api/browser/screenshot/:sessionId` - Take screenshot
 - `POST /api/browser/clear-logs/:sessionId` - Clear logs
-  - Clears all console and network logs for session
-  - No request body required
 
 ## Key Features
 
