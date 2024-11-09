@@ -23,6 +23,35 @@ app.listen(PORT, () => {
 
 // Handle shutdown
 process.on('SIGINT', async () => {
-    // Cleanup logic
-    process.exit();
+    try {
+        console.log('\nShutting down server...');
+        
+        // Get browserbase service
+        const browserbaseService = require('./services/browserbase-service');
+        const stagehandService = require('./services/stagehand-service');
+        
+        // Get all running sessions
+        const sessions = await browserbaseService.listRunningSessions();
+        
+        // Stop each session
+        if (sessions && sessions.length > 0) {
+            console.log(`Cleaning up ${sessions.length} browser sessions...`);
+            
+            await Promise.all(sessions.map(async (session) => {
+                try {
+                    await browserbaseService.stopSession(session.id);
+                    await stagehandService.cleanupInstance(session.id);
+                    console.log(`Stopped session: ${session.id}`);
+                } catch (error) {
+                    console.error(`Failed to stop session ${session.id}:`, error.message);
+                }
+            }));
+        }
+        
+        console.log('Cleanup complete. Exiting...');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
 }); 

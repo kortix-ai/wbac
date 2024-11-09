@@ -76,16 +76,35 @@ router.post('/navigate/:sessionId', async (req, res) => {
  * 
  * @apiParam {String} sessionId Session's unique identifier
  * @apiBody {String} action Natural language action to perform
- * @apiBody {String} [useVision='fallback'] Vision mode: 'always', 'never', or 'fallback'
+ * @apiBody {String} [useVision='fallback'] Vision mode: 'fallback'
  * @apiBody {String} [modelName] Optional AI model name to use
+ * @apiBody {Boolean} [includeLogs] Include logs from the action execution
+ * @apiBody {Object} [logFilters] Filters for included logs
+ * @apiBody {Object} [logFilters.console] Console log filters
+ * @apiBody {Boolean} [logFilters.console.includeErrors=true] Include error logs
+ * @apiBody {Boolean} [logFilters.console.includeWarnings=false] Include warning logs
+ * @apiBody {Boolean} [logFilters.console.includeInfo=false] Include info logs
+ * @apiBody {Boolean} [logFilters.console.includeTrace=false] Include trace logs
+ * @apiBody {Object} [logFilters.network] Network log filters
+ * @apiBody {Object} [logFilters.network.statusCodes] Status code filters
+ * @apiBody {Boolean} [logFilters.network.statusCodes.info=false] Include 1xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.success=false] Include 2xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.redirect=false] Include 3xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.clientError=true] Include 4xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.serverError=true] Include 5xx responses
+ * @apiBody {Boolean} [logFilters.network.includeHeaders=false] Include headers
+ * @apiBody {Boolean} [logFilters.network.includeBody=false] Include bodies
+ * @apiBody {Boolean} [logFilters.network.includeQueryParams=false] Include query parameters
+ * @apiBody {String[]} [logFilters.network.stringFilters] String filters for network requests
  * 
  * @apiSuccess {Object} result Action execution result
+ * @apiSuccess {Object} [logs] Filtered logs if requested
  * 
  * @apiError (Error 500) {Object} error Error object with message
  */
 router.post('/act/:sessionId', async (req, res) => {
     try {
-        const { action, useVision, modelName } = req.body;
+        const { action, useVision, modelName, includeLogs, logFilters } = req.body;
         
         if (!action) {
             return res.status(400).json({
@@ -102,15 +121,37 @@ router.post('/act/:sessionId', async (req, res) => {
             });
         }
 
+        const actionStartTime = new Date().toISOString();
+
         const result = await stagehand.act({ 
             action,
             useVision: useVision || 'fallback',
             modelName
         });
 
+        let logs;
+        if (includeLogs) {
+            const [consoleLogs, networkLogs] = await Promise.all([
+                stagehandService.getConsoleLogs(req.params.sessionId, {
+                    ...logFilters?.console,
+                    startTime: actionStartTime
+                }),
+                stagehandService.getNetworkLogs(req.params.sessionId, {
+                    ...logFilters?.network,
+                    startTime: actionStartTime
+                })
+            ]);
+
+            logs = {
+                console: consoleLogs,
+                network: networkLogs
+            };
+        }
+
         res.json({
             success: true,
-            result
+            result,
+            ...(includeLogs && { logs })
         });
     } catch (error) {
         res.status(500).json({ 
@@ -165,7 +206,7 @@ router.post('/extract/:sessionId', async (req, res) => {
  * 
  * @apiParam {String} sessionId Session's unique identifier
  * @apiBody {String} [instruction] Optional instruction to guide observation
- * @apiBody {String} [useVision='fallback'] Vision mode: 'always', 'never', or 'fallback'
+ * @apiBody {String} [useVision='fallback'] Vision mode: 'fallback'
  * @apiBody {String} [modelName] Optional AI model name to use
  * 
  * @apiSuccess {Object} actions List of possible actions and observations
@@ -259,8 +300,11 @@ router.get('/dom-state/:sessionId', async (req, res) => {
  * @apiQuery {Boolean} [includeWarnings=false] Include warning logs
  * @apiQuery {Boolean} [includeInfo=false] Include info logs
  * @apiQuery {Boolean} [includeTrace=false] Include trace logs
+ * @apiQuery {String[]} [includeStringFilters] Array of strings to include (matches message, path, type)
+ * @apiQuery {String[]} [excludeStringFilters] Array of strings to exclude (matches message, path, type)
  * @apiQuery {String} [startTime] Filter logs after this ISO timestamp
  * @apiQuery {String} [endTime] Filter logs before this ISO timestamp
+ * @apiQuery {Number} [truncateLength=500] Maximum length in characters for log messages before truncation
  * 
  * @apiSuccess {Object[]} logs Filtered console logs
  * 
@@ -269,38 +313,22 @@ router.get('/dom-state/:sessionId', async (req, res) => {
 router.get('/console-logs/:sessionId', async (req, res) => {
     try {
         const stagehand = await ensureStagehand(req.params.sessionId);
-        const logs = stagehandService.getLogs(req.params.sessionId);
-        if (!logs) throw new Error('Session not initialized');
-
-        // Default to showing errors if no filters specified
-        const filters = {
+        const logs = await stagehandService.getConsoleLogs(req.params.sessionId, {
             includeErrors: req.query.includeErrors !== 'false',
             includeWarnings: req.query.includeWarnings === 'true',
             includeInfo: req.query.includeInfo === 'true',
             includeTrace: req.query.includeTrace === 'true',
-            startTime: req.query.startTime ? new Date(req.query.startTime) : null,
-            endTime: req.query.endTime ? new Date(req.query.endTime) : null
-        };
-
-        const filteredLogs = logs.console.filter(log => {
-            if (filters.startTime && new Date(log.timestamp) < filters.startTime) return false;
-            if (filters.endTime && new Date(log.timestamp) > filters.endTime) return false;
-            
-            return (
-                (log.type === 'error' && filters.includeErrors) ||
-                (log.type === 'warning' && filters.includeWarnings) ||
-                (log.type === 'info' && filters.includeInfo) ||
-                (log.type === 'log' && filters.includeInfo) ||
-                (log.type === 'trace' && filters.includeTrace)
-            );
+            includeStringFilters: req.query.includeStringFilters,
+            excludeStringFilters: req.query.excludeStringFilters,
+            startTime: req.query.startTime,
+            endTime: req.query.endTime,
+            truncateLength: req.query.truncateLength ? parseInt(req.query.truncateLength) : undefined
         });
-
-        res.json({ logs: filteredLogs });
+        res.json({ logs });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
-
 
 /**
  * @api {get} /api/browser/network-logs/:sessionId Get Network Logs
@@ -313,87 +341,40 @@ router.get('/console-logs/:sessionId', async (req, res) => {
  * @apiParam {String} sessionId Session's unique identifier
  * @apiQuery {Boolean} [includeHeaders=false] Include request/response headers
  * @apiQuery {Boolean} [includeBody=false] Include request/response bodies
- * @apiQuery {String[]} [filterUrls] URLs to include (comma-separated)
- * @apiQuery {String[]} [excludeUrls] URLs to exclude (comma-separated)
+ * @apiQuery {Boolean} [includeInfo=false] Include informational responses (100-199)
+ * @apiQuery {Boolean} [includeSuccess=false] Include successful responses (200-299)
+ * @apiQuery {Boolean} [includeRedirect=false] Include redirection responses (300-399)
+ * @apiQuery {Boolean} [includeClientError=true] Include client error responses (400-499)
+ * @apiQuery {Boolean} [includeServerError=true] Include server error responses (500-599)
+ * @apiQuery {String[]} [includeStringFilters] Array of strings to include (matches URL, method, or headers)
+ * @apiQuery {String[]} [excludeStringFilters] Array of strings to exclude (matches URL, method, or headers)
+ * @apiQuery {String} [startTime] Filter logs after this ISO timestamp
+ * @apiQuery {String} [endTime] Filter logs before this ISO timestamp
+ * @apiQuery {Number} [truncateLength=5000] Maximum length for request/response bodies before truncation
  * 
  * @apiSuccess {Object[]} logs Filtered network logs
- * 
- * @apiError (Error 500) {Object} error Error object with message
  */
 router.get('/network-logs/:sessionId', async (req, res) => {
     try {
         const stagehand = await ensureStagehand(req.params.sessionId);
-        const logs = stagehandService.getLogs(req.params.sessionId);
-        if (!logs) throw new Error('Session not initialized');
-
-        // Default to showing all status codes if none specified
-        const filters = {
+        const logs = await stagehandService.getNetworkLogs(req.params.sessionId, {
             statusCodes: {
-                info: req.query.includeInfo !== 'false',
-                success: req.query.includeSuccess !== 'false',
-                redirect: req.query.includeRedirect !== 'false',
+                info: req.query.includeInfo === 'true',
+                success: req.query.includeSuccess === 'true',
+                redirect: req.query.includeRedirect === 'true',
                 clientError: req.query.includeClientError !== 'false',
                 serverError: req.query.includeServerError !== 'false'
             },
             includeHeaders: req.query.includeHeaders === 'true',
             includeBody: req.query.includeBody === 'true',
             includeQueryParams: req.query.includeQueryParams === 'true',
-            filterUrls: req.query.filterUrls ? req.query.filterUrls.split(',') : [],
-            excludeUrls: req.query.excludeUrls ? req.query.excludeUrls.split(',') : [],
-            startTime: req.query.startTime ? new Date(req.query.startTime) : null,
-            endTime: req.query.endTime ? new Date(req.query.endTime) : null
-        };
-
-        const filteredLogs = logs.network
-            .filter(log => {
-                if (filters.startTime && new Date(log.timestamp) < filters.startTime) return false;
-                if (filters.endTime && new Date(log.timestamp) > filters.endTime) return false;
-
-                const status = log.status;
-                const statusMatch = (
-                    (status >= 100 && status <= 199 && filters.statusCodes.info) ||
-                    (status >= 200 && status <= 299 && filters.statusCodes.success) ||
-                    (status >= 300 && status <= 399 && filters.statusCodes.redirect) ||
-                    (status >= 400 && status <= 499 && filters.statusCodes.clientError) ||
-                    (status >= 500 && status <= 599 && filters.statusCodes.serverError)
-                );
-
-                if (!statusMatch) return false;
-
-                if (filters.filterUrls.length > 0 && !filters.filterUrls.some(pattern => log.url.includes(pattern))) {
-                    return false;
-                }
-
-                if (filters.excludeUrls.some(pattern => log.url.includes(pattern))) {
-                    return false;
-                }
-
-                return true;
-            })
-            .map(log => {
-                const filteredLog = {
-                    url: log.url,
-                    method: log.method,
-                    status: log.status,
-                    timestamp: log.timestamp
-                };
-
-                if (filters.includeHeaders) {
-                    filteredLog.request = { ...filteredLog.request, headers: log.request.headers };
-                    filteredLog.response = { ...filteredLog.response, headers: log.response.headers };
-                }
-                if (filters.includeBody) {
-                    filteredLog.request = { ...filteredLog.request, body: log.request.body };
-                    filteredLog.response = { ...filteredLog.response, body: log.response.body };
-                }
-                if (filters.includeQueryParams) {
-                    filteredLog.request = { ...filteredLog.request, queryParams: log.request.queryParams };
-                }
-
-                return filteredLog;
-            });
-
-        res.json({ logs: filteredLogs });
+            includeStringFilters: req.query.includeStringFilters,
+            excludeStringFilters: req.query.excludeStringFilters,
+            startTime: req.query.startTime,
+            endTime: req.query.endTime,
+            truncateLength: req.query.truncateLength ? parseInt(req.query.truncateLength) : undefined
+        });
+        res.json({ logs });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
