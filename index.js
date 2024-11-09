@@ -5,7 +5,10 @@ const browserRoutes = require('./routes/browser-routes');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: /^http:\/\/localhost(:[0-9]+)?$/,
+    optionsSuccessStatus: 200
+}));
 
 // Routes
 app.use('/api/sessions', sessionRoutes);

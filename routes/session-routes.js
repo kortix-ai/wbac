@@ -144,4 +144,35 @@ router.get('/session/:sessionId', async (req, res) => {
     }
 });
 
+/**
+ * @api {get} /api/sessions/debug/:sessionId Get Session Debug URLs
+ * @apiName GetSessionDebugUrls
+ * @apiGroup Sessions
+ * @apiVersion 1.0.0
+ * 
+ * @apiDescription Retrieves debug URLs for a specific Browserbase session.
+ * 
+ * @apiParam {String} sessionId Session's unique identifier
+ * 
+ * @apiSuccess {Object} debugUrls Debug URLs object containing debuggerUrl, debuggerFullscreenUrl, wsUrl, and pages
+ * @apiSuccess {Boolean} success Operation success status
+ * 
+ * @apiError (Error 500) {Object} error Error object with message
+ */
+router.get('/debug/:sessionId', async (req, res) => {
+    try {
+        const debugUrls = await browserbaseService.getSessionDebugUrls(req.params.sessionId);
+        res.json({
+            success: true,
+            debugUrls
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
 module.exports = router; 

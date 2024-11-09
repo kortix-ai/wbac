@@ -24,7 +24,8 @@ class BrowserbaseService {
         try {
             const session = await this.client.sessions.create({
                 projectId: this.projectId,
-                keepAlive: true
+                keepAlive: true,
+                timeout: 7200 // 2 hours in seconds timeout
             });
             return session;
         } catch (error) {
@@ -52,6 +53,16 @@ class BrowserbaseService {
             return session;
         } catch (error) {
             console.error('Error retrieving Browserbase session:', error);
+            throw error;
+        }
+    }
+
+    async getSessionDebugUrls(sessionId) {
+        try {
+            const debugUrls = await this.client.sessions.debug(sessionId);
+            return debugUrls;
+        } catch (error) {
+            console.error('Error retrieving session debug URLs:', error);
             throw error;
         }
     }
