@@ -294,7 +294,7 @@ def main():
                 console_truncate_length = st.number_input(
                     "Console Truncate Length", 
                     value=500,
-                    step=100,
+                    step=10,
                     help="Maximum length of console messages before truncation",
                     key="action_console_truncate_length"
                 )
@@ -327,16 +327,21 @@ def main():
                     key="action_network_truncate_length"
                 )
                 st.write("Status Codes:")
-                network_include_info = st.checkbox("1xx (Informational)", key="action_network_include_info")
-                network_include_success = st.checkbox("2xx (Success)", key="action_network_include_success")
-                network_include_redirect = st.checkbox("3xx (Redirect)", key="action_network_include_redirect")
+                network_include_info = st.checkbox("1xx (Informational)", value=False, key="action_network_include_info")
+                network_include_success = st.checkbox("2xx (Success)", value=False, key="action_network_include_success")
+                network_include_redirect = st.checkbox("3xx (Redirect)", value=False, key="action_network_include_redirect")
                 network_include_client_error = st.checkbox("4xx (Client Error)", value=True, key="action_network_include_client_error")
                 network_include_server_error = st.checkbox("5xx (Server Error)", value=True, key="action_network_include_server_error")
             
             with col2:
-                network_include_headers = st.checkbox("Include Headers", key="action_network_include_headers")
-                network_include_body = st.checkbox("Include Body", key="action_network_include_body")
-                network_include_query_params = st.checkbox("Include Query Parameters", key="action_network_include_query_params")
+                st.write("Request Details:")
+                network_include_request_headers = st.checkbox("Include Request Headers", value=False, key="action_network_include_request_headers")
+                network_include_request_body = st.checkbox("Include Request Body", value=False, key="action_network_include_request_body")
+                network_include_request_params = st.checkbox("Include Query Parameters", value=False, key="action_network_include_request_params")
+                
+                st.write("Response Details:")
+                network_include_response_headers = st.checkbox("Include Response Headers", value=False, key="action_network_include_response_headers")
+                network_include_response_body = st.checkbox("Include Response Body", value=False, key="action_network_include_response_body")
                 
                 network_include_string_filters = st.text_area(
                     "Include Strings (one per line)", 
@@ -368,9 +373,15 @@ def main():
                         "clientError": network_include_client_error,
                         "serverError": network_include_server_error
                     },
-                    "includeHeaders": network_include_headers,
-                    "includeBody": network_include_body,
-                    "includeQueryParams": network_include_query_params,
+                    "request": {
+                        "includeHeaders": network_include_request_headers,
+                        "includeBody": network_include_request_body,
+                        "includeQueryParams": network_include_request_params
+                    },
+                    "response": {
+                        "includeHeaders": network_include_response_headers,
+                        "includeBody": network_include_response_body
+                    },
                     "truncateLength": network_truncate_length,
                     "includeStringFilters": [f.strip() for f in network_include_string_filters.split('\n') if f.strip()],
                     "excludeStringFilters": [f.strip() for f in network_exclude_string_filters.split('\n') if f.strip()]
@@ -404,15 +415,15 @@ def main():
                                 'info': 'blue',
                                 'log': 'green',
                                 'trace': 'gray'
-                            }.get(log['type'], 'black')
+                            }.get(log.get('type', 'log'), 'black')
                             
                             st.markdown(f"""
                             <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                                <span style="color: {log_color};">[{log['type'].upper()}]</span>
-                                <span style="color: #666;">({log['timestamp']})</span><br/>
-                                <strong>Message:</strong> {log['message']}<br/>
-                                <small>Path: {log['path']}</small>
-                                {f"<details><summary>Stack Trace</summary><pre>{log['stackTrace']}</pre></details>" if log.get('stackTrace') else ""}
+                                <span style="color: {log_color};">[{log.get('type', '').upper()}]</span>
+                                <span style="color: #666;">({log.get('timestamp', '')})</span><br/>
+                                <strong>Message:</strong> {log.get('message', '')}<br/>
+                                <small>Path: {log.get('path', '')}</small>
+                                {f"<details><summary>Stack Trace</summary><pre>{log.get('stackTrace', '')}</pre></details>" if log.get('stackTrace') else ""}
                             </div>
                             """, unsafe_allow_html=True)
                     
@@ -420,6 +431,7 @@ def main():
                     if result['logs'].get('network'):
                         st.subheader("Network Logs")
                         for log in result['logs']['network']:
+                            status = log.get('status', 0)
                             status_color = {
                                 range(100, 200): 'blue',
                                 range(200, 300): 'green',
@@ -428,13 +440,34 @@ def main():
                                 range(500, 600): 'purple'
                             }
                             log_color = next((color for range_obj, color in status_color.items() 
-                                            if log['status'] in range_obj), 'black')
+                                            if status in range_obj), 'black')
                             
                             st.markdown(f"""
                             <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                                <span style="color: {log_color};">[{log['status']}]</span> 
-                                <strong>{log['method']}</strong> {log['url']}<br/>
-                                <span style="color: #666;">({log['timestamp']})</span>
+                                <span style="color: {log_color};">[{status}]</span> 
+                                <strong>{log.get('method', '')}</strong> {log.get('url', '')}<br/>
+                                <span style="color: #666;">({log.get('timestamp', '')})</span>
+                                
+                                {f'''
+                                <details>
+                                    <summary>Request Details</summary>
+                                    <pre>{json.dumps(log.get('request', {}), indent=2)}</pre>
+                                </details>
+                                ''' if log.get('request') else ''}
+                                
+                                {f'''
+                                <details>
+                                    <summary>Response Details</summary>
+                                    <pre>{json.dumps(log.get('response', {}), indent=2)}</pre>
+                                </details>
+                                ''' if log.get('response') else ''}
+                                
+                                {f'''
+                                <details>
+                                    <summary>Timing Information</summary>
+                                    <pre>{json.dumps(log.get('timing', {}), indent=2)}</pre>
+                                </details>
+                                ''' if log.get('timing') else ''}
                             </div>
                             """, unsafe_allow_html=True)
     
@@ -496,7 +529,7 @@ def main():
                 truncate_length = st.number_input(
                     "Truncate Length", 
                     value=500,
-                    step=100,
+                    step=10,
                     help="Maximum length of log messages before truncation",
                     key="console_truncate_length"
                 )
@@ -559,9 +592,14 @@ def main():
                 include_server_error = st.checkbox("5xx (Server Error)", value=True, key="network_include_server_error")
             
             with col2:
-                include_headers = st.checkbox("Include Headers", value=False, key="network_include_headers")
-                include_body = st.checkbox("Include Body", value=False, key="network_include_body")
-                include_query_params = st.checkbox("Include Query Parameters", value=False, key="network_include_query_params")
+                st.write("Request Details:")
+                include_request_headers = st.checkbox("Include Request Headers", value=False, key="network_include_request_headers")
+                include_request_body = st.checkbox("Include Request Body", value=False, key="network_include_request_body")
+                include_request_params = st.checkbox("Include Query Parameters", value=False, key="network_include_request_params")
+                
+                st.write("Response Details:")
+                include_response_headers = st.checkbox("Include Response Headers", value=False, key="network_include_response_headers")
+                include_response_body = st.checkbox("Include Response Body", value=False, key="network_include_response_body")
                 
                 include_string_filters = st.text_area(
                     "Include Strings (one per line)", 
@@ -574,14 +612,6 @@ def main():
                     help="Enter strings to exclude from results. Requests matching any string will be hidden.",
                     key="logs_network_exclude_string_filters"
                 )
-                
-                use_time_filter = st.checkbox("Filter by Time", value=False, key="network_use_time_filter")
-                if use_time_filter:
-                    start_time = st.time_input("Start Time", key="network_start_time")
-                    end_time = st.time_input("End Time", key="network_end_time")
-                    today = datetime.now().date()
-                    start_datetime = datetime.combine(today, start_time).isoformat() if start_time else None
-                    end_datetime = datetime.combine(today, end_time).isoformat() if end_time else None
 
             filters = {
                 'statusCodes': {
@@ -591,18 +621,19 @@ def main():
                     'clientError': include_client_error,
                     'serverError': include_server_error
                 },
-                'includeHeaders': include_headers,
-                'includeBody': include_body,
-                'includeQueryParams': include_query_params,
+                'request': {
+                    'includeHeaders': include_request_headers,
+                    'includeBody': include_request_body,
+                    'includeQueryParams': include_request_params
+                },
+                'response': {
+                    'includeHeaders': include_response_headers,
+                    'includeBody': include_response_body
+                },
                 'truncateLength': truncate_length,
                 'includeStringFilters': [f.strip() for f in include_string_filters.split('\n') if f.strip()],
                 'excludeStringFilters': [f.strip() for f in exclude_string_filters.split('\n') if f.strip()]
             }
-            if use_time_filter:
-                filters.update({
-                    'startTime': start_datetime,
-                    'endTime': end_datetime
-                })
 
     if st.button("View Logs", key="view_logs_button"):
         with st.spinner("Fetching logs..."):

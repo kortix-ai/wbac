@@ -85,17 +85,22 @@ router.post('/navigate/:sessionId', async (req, res) => {
  * @apiBody {Boolean} [logFilters.console.includeWarnings=false] Include warning logs
  * @apiBody {Boolean} [logFilters.console.includeInfo=false] Include info logs
  * @apiBody {Boolean} [logFilters.console.includeTrace=false] Include trace logs
+ * @apiBody {String[]} [logFilters.console.includeStringFilters] Strings to include in console logs
+ * @apiBody {String[]} [logFilters.console.excludeStringFilters] Strings to exclude from console logs
+ * @apiBody {Number} [logFilters.console.truncateLength=500] Maximum length for console messages
  * @apiBody {Object} [logFilters.network] Network log filters
  * @apiBody {Object} [logFilters.network.statusCodes] Status code filters
- * @apiBody {Boolean} [logFilters.network.statusCodes.info=false] Include 1xx responses
- * @apiBody {Boolean} [logFilters.network.statusCodes.success=false] Include 2xx responses
- * @apiBody {Boolean} [logFilters.network.statusCodes.redirect=false] Include 3xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.info=true] Include 1xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.success=true] Include 2xx responses
+ * @apiBody {Boolean} [logFilters.network.statusCodes.redirect=true] Include 3xx responses
  * @apiBody {Boolean} [logFilters.network.statusCodes.clientError=true] Include 4xx responses
  * @apiBody {Boolean} [logFilters.network.statusCodes.serverError=true] Include 5xx responses
  * @apiBody {Boolean} [logFilters.network.includeHeaders=false] Include headers
- * @apiBody {Boolean} [logFilters.network.includeBody=false] Include bodies
- * @apiBody {Boolean} [logFilters.network.includeQueryParams=false] Include query parameters
- * @apiBody {String[]} [logFilters.network.stringFilters] String filters for network requests
+ * @apiBody {Boolean} [logFilters.network.includeBody=true] Include bodies
+ * @apiBody {Boolean} [logFilters.network.includeQueryParams=true] Include query parameters
+ * @apiBody {String[]} [logFilters.network.includeStringFilters] Strings to include in network logs
+ * @apiBody {String[]} [logFilters.network.excludeStringFilters] Strings to exclude from network logs
+ * @apiBody {Number} [logFilters.network.truncateLength=500] Maximum length for bodies
  * 
  * @apiSuccess {Object} result Action execution result
  * @apiSuccess {Object} [logs] Filtered logs if requested
@@ -129,23 +134,34 @@ router.post('/act/:sessionId', async (req, res) => {
             modelName
         });
 
-        let logs;
+        let logs = null;
         if (includeLogs) {
             const [consoleLogs, networkLogs] = await Promise.all([
                 stagehandService.getConsoleLogs(req.params.sessionId, {
-                    ...logFilters?.console,
-                    startTime: actionStartTime
+                    levels: {
+                        error: logFilters?.console?.levels?.error ?? true,
+                        warning: logFilters?.console?.levels?.warning ?? true,
+                        info: logFilters?.console?.levels?.info ?? true,
+                        trace: logFilters?.console?.levels?.trace ?? false
+                    },
+                    includeStringFilters: logFilters?.console?.includeStringFilters,
+                    excludeStringFilters: logFilters?.console?.excludeStringFilters,
+                    startTime: actionStartTime,
+                    truncateLength: logFilters?.console?.truncateLength
                 }),
                 stagehandService.getNetworkLogs(req.params.sessionId, {
-                    ...logFilters?.network,
-                    startTime: actionStartTime
+                    statusCodes: logFilters?.network?.statusCodes,
+                    includeHeaders: logFilters?.network?.includeHeaders,
+                    includeBody: logFilters?.network?.includeBody,
+                    includeQueryParams: logFilters?.network?.includeQueryParams,
+                    includeStringFilters: logFilters?.network?.includeStringFilters,
+                    excludeStringFilters: logFilters?.network?.excludeStringFilters,
+                    startTime: actionStartTime,
+                    truncateLength: logFilters?.network?.truncateLength
                 })
             ]);
 
-            logs = {
-                console: consoleLogs,
-                network: networkLogs
-            };
+            logs = { console: consoleLogs, network: networkLogs };
         }
 
         res.json({
@@ -155,7 +171,7 @@ router.post('/act/:sessionId', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ 
-            success: false,
+            success: false, 
             error: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -296,15 +312,15 @@ router.get('/dom-state/:sessionId', async (req, res) => {
  * @apiDescription Retrieves filtered console logs from the browser session.
  * 
  * @apiParam {String} sessionId Session's unique identifier
- * @apiQuery {Boolean} [includeErrors=true] Include error logs
- * @apiQuery {Boolean} [includeWarnings=false] Include warning logs
- * @apiQuery {Boolean} [includeInfo=false] Include info logs
- * @apiQuery {Boolean} [includeTrace=false] Include trace logs
+ * @apiQuery {Boolean} [levels.error=true] Include error logs
+ * @apiQuery {Boolean} [levels.warning=true] Include warning logs
+ * @apiQuery {Boolean} [levels.info=true] Include info logs
+ * @apiQuery {Boolean} [levels.trace=false] Include trace logs
  * @apiQuery {String[]} [includeStringFilters] Array of strings to include (matches message, path, type)
  * @apiQuery {String[]} [excludeStringFilters] Array of strings to exclude (matches message, path, type)
  * @apiQuery {String} [startTime] Filter logs after this ISO timestamp
  * @apiQuery {String} [endTime] Filter logs before this ISO timestamp
- * @apiQuery {Number} [truncateLength=500] Maximum length in characters for log messages before truncation
+ * @apiQuery {Number} [truncateLength=500] Maximum length for log messages before truncation
  * 
  * @apiSuccess {Object[]} logs Filtered console logs
  * 
@@ -314,19 +330,22 @@ router.get('/console-logs/:sessionId', async (req, res) => {
     try {
         const stagehand = await ensureStagehand(req.params.sessionId);
         const logs = await stagehandService.getConsoleLogs(req.params.sessionId, {
-            includeErrors: req.query.includeErrors !== 'false',
-            includeWarnings: req.query.includeWarnings === 'true',
-            includeInfo: req.query.includeInfo === 'true',
-            includeTrace: req.query.includeTrace === 'true',
+            levels: {
+                error: req.query.error !== 'false',
+                warning: req.query.warning !== 'false',
+                info: req.query.info !== 'false',
+                trace: req.query.trace === 'true'
+            },
             includeStringFilters: req.query.includeStringFilters,
             excludeStringFilters: req.query.excludeStringFilters,
             startTime: req.query.startTime,
             endTime: req.query.endTime,
             truncateLength: req.query.truncateLength ? parseInt(req.query.truncateLength) : undefined
         });
-        res.json({ logs });
+        res.json({ success: true, logs });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error getting console logs:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -340,17 +359,17 @@ router.get('/console-logs/:sessionId', async (req, res) => {
  * 
  * @apiParam {String} sessionId Session's unique identifier
  * @apiQuery {Boolean} [includeHeaders=false] Include request/response headers
- * @apiQuery {Boolean} [includeBody=false] Include request/response bodies
- * @apiQuery {Boolean} [includeInfo=false] Include informational responses (100-199)
- * @apiQuery {Boolean} [includeSuccess=false] Include successful responses (200-299)
- * @apiQuery {Boolean} [includeRedirect=false] Include redirection responses (300-399)
+ * @apiQuery {Boolean} [includeBody=true] Include request/response bodies
+ * @apiQuery {Boolean} [includeInfo=true] Include informational responses (100-199)
+ * @apiQuery {Boolean} [includeSuccess=true] Include successful responses (200-299)
+ * @apiQuery {Boolean} [includeRedirect=true] Include redirection responses (300-399)
  * @apiQuery {Boolean} [includeClientError=true] Include client error responses (400-499)
  * @apiQuery {Boolean} [includeServerError=true] Include server error responses (500-599)
  * @apiQuery {String[]} [includeStringFilters] Array of strings to include (matches URL, method, or headers)
  * @apiQuery {String[]} [excludeStringFilters] Array of strings to exclude (matches URL, method, or headers)
  * @apiQuery {String} [startTime] Filter logs after this ISO timestamp
  * @apiQuery {String} [endTime] Filter logs before this ISO timestamp
- * @apiQuery {Number} [truncateLength=5000] Maximum length for request/response bodies before truncation
+ * @apiQuery {Number} [truncateLength=500] Maximum length for request/response bodies before truncation
  * 
  * @apiSuccess {Object[]} logs Filtered network logs
  */
@@ -359,24 +378,26 @@ router.get('/network-logs/:sessionId', async (req, res) => {
         const stagehand = await ensureStagehand(req.params.sessionId);
         const logs = await stagehandService.getNetworkLogs(req.params.sessionId, {
             statusCodes: {
-                info: req.query.includeInfo === 'true',
-                success: req.query.includeSuccess === 'true',
-                redirect: req.query.includeRedirect === 'true',
+                info: req.query.includeInfo !== 'false',
+                success: req.query.includeSuccess !== 'false',
+                redirect: req.query.includeRedirect !== 'false',
                 clientError: req.query.includeClientError !== 'false',
                 serverError: req.query.includeServerError !== 'false'
             },
             includeHeaders: req.query.includeHeaders === 'true',
-            includeBody: req.query.includeBody === 'true',
-            includeQueryParams: req.query.includeQueryParams === 'true',
+            includeBody: req.query.includeBody !== 'false',
+            includeQueryParams: req.query.includeQueryParams !== 'false',
             includeStringFilters: req.query.includeStringFilters,
             excludeStringFilters: req.query.excludeStringFilters,
             startTime: req.query.startTime,
             endTime: req.query.endTime,
             truncateLength: req.query.truncateLength ? parseInt(req.query.truncateLength) : undefined
         });
-        res.json({ logs });
+        
+        res.json({ success: true, logs });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error getting network logs:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

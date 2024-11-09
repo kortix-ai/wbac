@@ -137,49 +137,55 @@ class StagehandService {
         }
     }
 
-    async getConsoleLogs(sessionId, filters = {}) {
-        const logs = this.getLogs(sessionId);
-        if (!logs) throw new Error('Session not initialized');
-
-        const normalizedFilters = {
-            includeErrors: filters.includeErrors !== false,
-            includeWarnings: filters.includeWarnings === true,
-            includeInfo: filters.includeInfo === true,
-            includeTrace: filters.includeTrace === true,
-            includeStringFilters: Array.isArray(filters.includeStringFilters) ? 
-                filters.includeStringFilters.map(f => f.toLowerCase()) : 
-                (filters.includeStringFilters ? [filters.includeStringFilters.toLowerCase()] : []),
+    _normalizeConsoleLogFilters(filters = {}) {
+        return {
+            levels: {
+                error: filters.levels?.error ?? true,
+                warning: filters.levels?.warning ?? true,
+                info: filters.levels?.info ?? true,
+                trace: filters.levels?.trace ?? false
+            },
             excludeStringFilters: Array.isArray(filters.excludeStringFilters) ? 
-                filters.excludeStringFilters.map(f => f.toLowerCase()) : 
-                (filters.excludeStringFilters ? [filters.excludeStringFilters.toLowerCase()] : []),
+                filters.excludeStringFilters.map(f => f.toLowerCase()) : [],
+            includeStringFilters: Array.isArray(filters.includeStringFilters) ? 
+                filters.includeStringFilters.map(f => f.toLowerCase()) : [],
             startTime: filters.startTime ? new Date(filters.startTime) : null,
             endTime: filters.endTime ? new Date(filters.endTime) : null,
             truncateLength: filters.truncateLength || 500
         };
+    }
+
+    async getConsoleLogs(sessionId, filters = {}) {
+        const logs = this.getLogs(sessionId);
+        if (!logs) throw new Error('Session not initialized');
+
+        const normalizedFilters = this._normalizeConsoleLogFilters(filters);
 
         return logs.console
             .filter(log => {
+                if (!log) return false;
+
                 if (normalizedFilters.startTime && new Date(log.timestamp) < normalizedFilters.startTime) return false;
                 if (normalizedFilters.endTime && new Date(log.timestamp) > normalizedFilters.endTime) return false;
-                
+
                 const typeMatch = (
-                    (log.type === 'error' && normalizedFilters.includeErrors) ||
-                    (log.type === 'warning' && normalizedFilters.includeWarnings) ||
-                    (log.type === 'info' && normalizedFilters.includeInfo) ||
-                    (log.type === 'log' && normalizedFilters.includeInfo) ||
-                    (log.type === 'trace' && normalizedFilters.includeTrace)
+                    (log.type === 'error' && normalizedFilters.levels.error) ||
+                    (log.type === 'warning' && normalizedFilters.levels.warning) ||
+                    ((log.type === 'info' || log.type === 'log') && normalizedFilters.levels.info) ||
+                    (log.type === 'trace' && normalizedFilters.levels.trace)
                 );
                 if (!typeMatch) return false;
 
                 const searchableContent = [
-                    log.message.toLowerCase(),
-                    log.path.toLowerCase(),
-                    log.type.toLowerCase(),
-                    log.stackTrace ? log.stackTrace.toLowerCase() : ''
+                    log.message?.toLowerCase() || '',
+                    log.path?.toLowerCase() || '',
+                    log.type?.toLowerCase() || '',
+                    log.stackTrace?.toLowerCase() || '',
+                    ...(log.args || []).map(arg => String(arg).toLowerCase())
                 ].join(' ');
 
-                if (normalizedFilters.excludeStringFilters.length > 0) {
-                    if (normalizedFilters.excludeStringFilters.some(filter => searchableContent.includes(filter))) {
+                for (const excludeFilter of normalizedFilters.excludeStringFilters) {
+                    if (searchableContent.includes(excludeFilter)) {
                         return false;
                     }
                 }
@@ -210,34 +216,38 @@ class StagehandService {
         };
     }
 
+    _normalizeLogFilters(filters = {}) {
+        return {
+            statusCodes: {
+                info: filters.statusCodes?.info ?? true,
+                success: filters.statusCodes?.success ?? true,
+                redirect: filters.statusCodes?.redirect ?? true,
+                clientError: filters.statusCodes?.clientError ?? true,
+                serverError: filters.statusCodes?.serverError ?? true
+            },
+            includeHeaders: filters.includeHeaders ?? false,
+            includeBody: filters.includeBody ?? true,
+            includeQueryParams: filters.includeQueryParams ?? true,
+            excludeStringFilters: Array.isArray(filters.excludeStringFilters) ? 
+                filters.excludeStringFilters.map(f => f.toLowerCase()) : [],
+            includeStringFilters: Array.isArray(filters.includeStringFilters) ? 
+                filters.includeStringFilters.map(f => f.toLowerCase()) : [],
+            startTime: filters.startTime ? new Date(filters.startTime) : null,
+            endTime: filters.endTime ? new Date(filters.endTime) : null,
+            truncateLength: filters.truncateLength || 5000
+        };
+    }
+
     async getNetworkLogs(sessionId, filters = {}) {
         const logs = this.getLogs(sessionId);
         if (!logs) throw new Error('Session not initialized');
 
-        const normalizedFilters = {
-            statusCodes: {
-                info: filters.statusCodes?.info === true,
-                success: filters.statusCodes?.success === true,
-                redirect: filters.statusCodes?.redirect === true,
-                clientError: filters.statusCodes?.clientError !== false,
-                serverError: filters.statusCodes?.serverError !== false
-            },
-            includeHeaders: filters.includeHeaders === true,
-            includeBody: filters.includeBody === true,
-            includeQueryParams: filters.includeQueryParams === true,
-            includeStringFilters: Array.isArray(filters.includeStringFilters) ? 
-                filters.includeStringFilters.map(f => f.toLowerCase()) : 
-                (filters.includeStringFilters ? [filters.includeStringFilters.toLowerCase()] : []),
-            excludeStringFilters: Array.isArray(filters.excludeStringFilters) ? 
-                filters.excludeStringFilters.map(f => f.toLowerCase()) : 
-                (filters.excludeStringFilters ? [filters.excludeStringFilters.toLowerCase()] : []),
-            startTime: filters.startTime ? new Date(filters.startTime) : null,
-            endTime: filters.endTime ? new Date(filters.endTime) : null,
-            truncateLength: filters.truncateLength || 5000 // Default 5000 chars for network logs
-        };
+        const normalizedFilters = this._normalizeLogFilters(filters);
 
-        return logs.network
+        const filteredLogs = logs.network
             .filter(log => {
+                if (!log) return false;
+                
                 if (normalizedFilters.startTime && new Date(log.timestamp) < normalizedFilters.startTime) return false;
                 if (normalizedFilters.endTime && new Date(log.timestamp) > normalizedFilters.endTime) return false;
 
@@ -249,23 +259,25 @@ class StagehandService {
                     (status >= 400 && status <= 499 && normalizedFilters.statusCodes.clientError) ||
                     (status >= 500 && status <= 599 && normalizedFilters.statusCodes.serverError)
                 );
+
                 if (!statusMatch) return false;
 
                 const searchableContent = [
-                    log.url.toLowerCase(),
-                    log.method.toLowerCase(),
-                    ...(log.request?.headers ? [JSON.stringify(log.request.headers).toLowerCase()] : []),
-                    ...(log.response?.headers ? [JSON.stringify(log.response.headers).toLowerCase()] : [])
+                    log.url?.toLowerCase() || '',
+                    log.method?.toLowerCase() || '',
+                    JSON.stringify(log.request?.headers || {}).toLowerCase(),
+                    JSON.stringify(log.response?.headers || {}).toLowerCase(),
+                    (log.request?.body ? String(log.request.body).toLowerCase() : ''),
+                    (log.response?.body ? String(log.response.body).toLowerCase() : '')
                 ].join(' ');
 
-                // Check exclude filters first
-                if (normalizedFilters.excludeStringFilters.length > 0) {
-                    if (normalizedFilters.excludeStringFilters.some(filter => searchableContent.includes(filter))) {
+                for (const excludeFilter of normalizedFilters.excludeStringFilters) {
+                    if (searchableContent.includes(excludeFilter)) {
+                        console.log(`Excluding log with URL ${log.url} due to filter: ${excludeFilter}`);
                         return false;
                     }
                 }
 
-                // Then check include filters
                 if (normalizedFilters.includeStringFilters.length > 0) {
                     return normalizedFilters.includeStringFilters.some(filter => searchableContent.includes(filter));
                 }
@@ -273,16 +285,21 @@ class StagehandService {
                 return true;
             })
             .map(log => this._formatNetworkLog(log, normalizedFilters));
+
+        // console.log('Filtered network logs count:', filteredLogs.length);
+
+        return filteredLogs;
     }
 
     _formatNetworkLog(log, filters) {
         const truncate = (str, length) => {
             if (!str) return str;
+            if (typeof str === 'object') str = JSON.stringify(str);
             if (str.length <= length) return str;
             return str.substring(0, length) + '... (truncated)';
         };
 
-        const formattedLog = {
+        return {
             url: log.url,
             method: log.method,
             status: log.status,
@@ -292,40 +309,14 @@ class StagehandService {
                 url: log.url,
                 queryParams: filters.includeQueryParams ? log.request?.queryParams : undefined,
                 headers: filters.includeHeaders ? log.request?.headers : undefined,
-                body: filters.includeBody ? 
-                    truncate(
-                        typeof log.request?.body === 'object' ? 
-                            JSON.stringify(log.request.body) : 
-                            String(log.request?.body || ''),
-                        filters.truncateLength
-                    ) : undefined
+                body: filters.includeBody ? truncate(log.request?.body, filters.truncateLength) : undefined
             },
             response: {
                 status: log.status,
                 headers: filters.includeHeaders ? log.response?.headers : undefined,
-                body: filters.includeBody ? 
-                    truncate(
-                        typeof log.response?.body === 'object' ? 
-                            JSON.stringify(log.response.body) : 
-                            String(log.response?.body || ''),
-                        filters.truncateLength
-                    ) : undefined
+                body: filters.includeBody ? truncate(log.response?.body, filters.truncateLength) : undefined
             }
         };
-
-        // Include timing information if available
-        if (log.timing) {
-            formattedLog.timing = {
-                dnsLookup: log.timing.dnsLookup,
-                tcpConnection: log.timing.tcpConnection,
-                tlsHandshake: log.timing.tlsHandshake,
-                firstByte: log.timing.firstByte,
-                contentDownload: log.timing.contentDownload,
-                total: log.timing.total
-            };
-        }
-
-        return formattedLog;
     }
 }
 
