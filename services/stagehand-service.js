@@ -141,8 +141,8 @@ class StagehandService {
         return {
             levels: {
                 error: filters.levels?.error ?? true,
-                warning: filters.levels?.warning ?? true,
-                info: filters.levels?.info ?? true,
+                warning: filters.levels?.warning ?? false,
+                info: filters.levels?.info ?? false,
                 trace: filters.levels?.trace ?? false
             },
             excludeStringFilters: Array.isArray(filters.excludeStringFilters) ? 
@@ -273,7 +273,7 @@ class StagehandService {
 
                 for (const excludeFilter of normalizedFilters.excludeStringFilters) {
                     if (searchableContent.includes(excludeFilter)) {
-                        console.log(`Excluding log with URL ${log.url} due to filter: ${excludeFilter}`);
+                        // console.log(`Excluding log with URL ${log.url} due to filter: ${excludeFilter}`);
                         return false;
                     }
                 }

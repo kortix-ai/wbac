@@ -140,8 +140,8 @@ router.post('/act/:sessionId', async (req, res) => {
                 stagehandService.getConsoleLogs(req.params.sessionId, {
                     levels: {
                         error: logFilters?.console?.levels?.error ?? true,
-                        warning: logFilters?.console?.levels?.warning ?? true,
-                        info: logFilters?.console?.levels?.info ?? true,
+                        warning: logFilters?.console?.levels?.warning ?? false,
+                        info: logFilters?.console?.levels?.info ?? false,
                         trace: logFilters?.console?.levels?.trace ?? false
                     },
                     includeStringFilters: logFilters?.console?.includeStringFilters,
@@ -150,10 +150,16 @@ router.post('/act/:sessionId', async (req, res) => {
                     truncateLength: logFilters?.console?.truncateLength
                 }),
                 stagehandService.getNetworkLogs(req.params.sessionId, {
-                    statusCodes: logFilters?.network?.statusCodes,
-                    includeHeaders: logFilters?.network?.includeHeaders,
-                    includeBody: logFilters?.network?.includeBody,
-                    includeQueryParams: logFilters?.network?.includeQueryParams,
+                    statusCodes: {
+                        info: logFilters?.network?.statusCodes?.info ?? true,
+                        success: logFilters?.network?.statusCodes?.success ?? true,
+                        redirect: logFilters?.network?.statusCodes?.redirect ?? true,
+                        clientError: logFilters?.network?.statusCodes?.clientError ?? true,
+                        serverError: logFilters?.network?.statusCodes?.serverError ?? true
+                    },
+                    includeHeaders: logFilters?.network?.includeHeaders ?? false,
+                    includeBody: logFilters?.network?.includeBody ?? true,
+                    includeQueryParams: logFilters?.network?.includeQueryParams ?? true,
                     includeStringFilters: logFilters?.network?.includeStringFilters,
                     excludeStringFilters: logFilters?.network?.excludeStringFilters,
                     startTime: actionStartTime,
@@ -313,8 +319,8 @@ router.get('/dom-state/:sessionId', async (req, res) => {
  * 
  * @apiParam {String} sessionId Session's unique identifier
  * @apiQuery {Boolean} [levels.error=true] Include error logs
- * @apiQuery {Boolean} [levels.warning=true] Include warning logs
- * @apiQuery {Boolean} [levels.info=true] Include info logs
+ * @apiQuery {Boolean} [levels.warning=false] Include warning logs
+ * @apiQuery {Boolean} [levels.info=false] Include info logs
  * @apiQuery {Boolean} [levels.trace=false] Include trace logs
  * @apiQuery {String[]} [includeStringFilters] Array of strings to include (matches message, path, type)
  * @apiQuery {String[]} [excludeStringFilters] Array of strings to exclude (matches message, path, type)
@@ -332,8 +338,8 @@ router.get('/console-logs/:sessionId', async (req, res) => {
         const logs = await stagehandService.getConsoleLogs(req.params.sessionId, {
             levels: {
                 error: req.query.error !== 'false',
-                warning: req.query.warning !== 'false',
-                info: req.query.info !== 'false',
+                warning: req.query.warning === 'true',
+                info: req.query.info === 'true',
                 trace: req.query.trace === 'true'
             },
             includeStringFilters: req.query.includeStringFilters,

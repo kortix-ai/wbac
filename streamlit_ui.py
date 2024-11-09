@@ -7,6 +7,40 @@ from datetime import datetime
 
 API_URL = "http://localhost:3000/api"
 
+# Add constants for default values
+DEFAULT_NAVIGATION_TIMEOUT = 30000
+DEFAULT_VISION_MODE = 'fallback'
+
+# Default log filter values matching browser-routes.js
+DEFAULT_LOG_FILTERS = {
+    'console': {
+        'levels': {
+            'error': True,
+            'warning': False,
+            'info': False,
+            'trace': False
+        },
+        'truncateLength': 500,
+        'includeStringFilters': [],
+        'excludeStringFilters': []
+    },
+    'network': {
+        'statusCodes': {
+            'info': True,
+            'success': True,
+            'redirect': True,
+            'clientError': True,
+            'serverError': True
+        },
+        'includeHeaders': False,
+        'includeBody': True,
+        'includeQueryParams': True,
+        'truncateLength': 500,
+        'includeStringFilters': [],
+        'excludeStringFilters': []
+    }
+}
+
 def create_session():
     response = requests.post(f"{API_URL}/sessions/create-session")
     return response.json()
@@ -16,17 +50,26 @@ def stop_session(session_id):
     return response.json()
 
 def navigate(session_id, url):
-    response = requests.post(f"{API_URL}/browser/navigate/{session_id}", json={"url": url})
+    """Navigate browser with default timeout"""
+    response = requests.post(
+        f"{API_URL}/browser/navigate/{session_id}", 
+        json={
+            "url": url,
+            "timeout": DEFAULT_NAVIGATION_TIMEOUT
+        }
+    )
     return response.json()
 
-def perform_action(session_id, action, use_vision=False, model_name=None, include_logs=False, log_filters=None):
-    response = requests.post(f"{API_URL}/browser/act/{session_id}", json={
+def perform_action(session_id, action, use_vision=DEFAULT_VISION_MODE, model_name=None, include_logs=False, log_filters=None):
+    """Perform browser action with default vision mode and log filters"""
+    payload = {
         "action": action,
-        "useVision": use_vision,
+        "useVision": use_vision or DEFAULT_VISION_MODE,
         "modelName": model_name,
         "includeLogs": include_logs,
-        "logFilters": log_filters
-    })
+        "logFilters": log_filters or DEFAULT_LOG_FILTERS if include_logs else None
+    }
+    response = requests.post(f"{API_URL}/browser/act/{session_id}", json=payload)
     return response.json()
 
 def extract_data(session_id, instruction, schema, model_name=None):
@@ -37,12 +80,14 @@ def extract_data(session_id, instruction, schema, model_name=None):
     })
     return response.json()
 
-def observe_page(session_id, instruction=None, use_vision=False, model_name=None):
-    response = requests.post(f"{API_URL}/browser/observe/{session_id}", json={
+def observe_page(session_id, instruction=None, use_vision=DEFAULT_VISION_MODE, model_name=None):
+    """Observe page with default vision mode"""
+    payload = {
         "instruction": instruction,
-        "useVision": use_vision,
+        "useVision": use_vision or DEFAULT_VISION_MODE,
         "modelName": model_name
-    })
+    }
+    response = requests.post(f"{API_URL}/browser/observe/{session_id}", json=payload)
     return response.json()
 
 def get_screenshot(session_id):
@@ -56,53 +101,58 @@ def get_dom_state(session_id):
     return response.json()
 
 def get_console_logs(session_id, filters=None):
-    params = {}
-    if filters:
-        params.update({
-            'includeErrors': str(filters.get('includeErrors', True)).lower(),
-            'includeWarnings': str(filters.get('includeWarnings', False)).lower(),
-            'includeInfo': str(filters.get('includeInfo', False)).lower(),
-            'includeTrace': str(filters.get('includeTrace', False)).lower(),
-            'truncateLength': str(filters.get('truncateLength', 0))
-        })
+    """Get console logs with default filters"""
+    params = {
+        'error': str(filters.get('levels', {}).get('error', DEFAULT_LOG_FILTERS['console']['levels']['error'])).lower(),
+        'warning': str(filters.get('levels', {}).get('warning', DEFAULT_LOG_FILTERS['console']['levels']['warning'])).lower(),
+        'info': str(filters.get('levels', {}).get('info', DEFAULT_LOG_FILTERS['console']['levels']['info'])).lower(),
+        'trace': str(filters.get('levels', {}).get('trace', DEFAULT_LOG_FILTERS['console']['levels']['trace'])).lower(),
+        'truncateLength': filters.get('truncateLength', DEFAULT_LOG_FILTERS['console']['truncateLength'])
+    }
+    
+    # Properly handle string filters as arrays
+    if filters.get('includeStringFilters'):
+        # Convert to list if it's a string
+        if isinstance(filters['includeStringFilters'], str):
+            filters['includeStringFilters'] = [f.strip() for f in filters['includeStringFilters'].split('\n') if f.strip()]
+        params['includeStringFilters[]'] = filters['includeStringFilters']
         
-        if filters.get('includeStringFilters'):
-            params['includeStringFilters'] = filters['includeStringFilters']
-        if filters.get('excludeStringFilters'):
-            params['excludeStringFilters'] = filters['excludeStringFilters']
-            
-        if filters.get('startTime'):
-            params['startTime'] = filters['startTime']
-        if filters.get('endTime'):
-            params['endTime'] = filters['endTime']
+    if filters.get('excludeStringFilters'):
+        # Convert to list if it's a string
+        if isinstance(filters['excludeStringFilters'], str):
+            filters['excludeStringFilters'] = [f.strip() for f in filters['excludeStringFilters'].split('\n') if f.strip()]
+        params['excludeStringFilters[]'] = filters['excludeStringFilters']
     
     response = requests.get(f"{API_URL}/browser/console-logs/{session_id}", params=params)
     return response.json()
 
 def get_network_logs(session_id, filters=None):
-    params = {}
-    if filters:
-        params.update({
-            'includeInfo': str(filters.get('statusCodes', {}).get('info', False)).lower(),
-            'includeSuccess': str(filters.get('statusCodes', {}).get('success', False)).lower(),
-            'includeRedirect': str(filters.get('statusCodes', {}).get('redirect', False)).lower(),
-            'includeClientError': str(filters.get('statusCodes', {}).get('clientError', True)).lower(),
-            'includeServerError': str(filters.get('statusCodes', {}).get('serverError', True)).lower(),
-            'includeHeaders': str(filters.get('includeHeaders', False)).lower(),
-            'includeBody': str(filters.get('includeBody', False)).lower(),
-            'includeQueryParams': str(filters.get('includeQueryParams', False)).lower(),
-            'truncateLength': str(filters.get('truncateLength', 500))
-        })
+    """Get network logs with default filters"""
+    default_network = DEFAULT_LOG_FILTERS['network']
+    params = {
+        'includeInfo': str(filters.get('statusCodes', {}).get('info', default_network['statusCodes']['info'])).lower(),
+        'includeSuccess': str(filters.get('statusCodes', {}).get('success', default_network['statusCodes']['success'])).lower(),
+        'includeRedirect': str(filters.get('statusCodes', {}).get('redirect', default_network['statusCodes']['redirect'])).lower(),
+        'includeClientError': str(filters.get('statusCodes', {}).get('clientError', default_network['statusCodes']['clientError'])).lower(),
+        'includeServerError': str(filters.get('statusCodes', {}).get('serverError', default_network['statusCodes']['serverError'])).lower(),
+        'includeHeaders': str(filters.get('includeHeaders', default_network['includeHeaders'])).lower(),
+        'includeBody': str(filters.get('includeBody', default_network['includeBody'])).lower(),
+        'includeQueryParams': str(filters.get('includeQueryParams', default_network['includeQueryParams'])).lower(),
+        'truncateLength': filters.get('truncateLength', default_network['truncateLength'])
+    }
+    
+    # Properly handle string filters as arrays
+    if filters.get('includeStringFilters'):
+        # Convert to list if it's a string
+        if isinstance(filters['includeStringFilters'], str):
+            filters['includeStringFilters'] = [f.strip() for f in filters['includeStringFilters'].split('\n') if f.strip()]
+        params['includeStringFilters[]'] = filters['includeStringFilters']
         
-        if filters.get('includeStringFilters'):
-            params['includeStringFilters'] = filters['includeStringFilters']
-        if filters.get('excludeStringFilters'):
-            params['excludeStringFilters'] = filters['excludeStringFilters']
-            
-        if filters.get('startTime'):
-            params['startTime'] = filters['startTime']
-        if filters.get('endTime'):
-            params['endTime'] = filters['endTime']
+    if filters.get('excludeStringFilters'):
+        # Convert to list if it's a string
+        if isinstance(filters['excludeStringFilters'], str):
+            filters['excludeStringFilters'] = [f.strip() for f in filters['excludeStringFilters'].split('\n') if f.strip()]
+        params['excludeStringFilters[]'] = filters['excludeStringFilters']
     
     response = requests.get(f"{API_URL}/browser/network-logs/{session_id}", params=params)
     return response.json()
@@ -120,6 +170,134 @@ def get_running_sessions():
 def get_session_details(session_id):
     response = requests.get(f"{API_URL}/sessions/session/{session_id}")
     return response.json()
+
+def render_network_log(log, parent_container):
+    """Renders a single network log entry with expandable sections"""
+    status = log.get('status', 0)
+    status_color = {
+        range(100, 200): 'blue',
+        range(200, 300): 'green',
+        range(300, 400): 'orange',
+        range(400, 500): 'red',
+        range(500, 600): 'purple'
+    }
+    log_color = next((color for range_obj, color in status_color.items() 
+                    if status in range_obj), 'black')
+    
+    parent_container.markdown(f"""
+    <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+        <span style="color: {log_color};">[{status}]</span> 
+        <strong>{log.get('method', '')}</strong> {log.get('url', '')}<br/>
+        <span style="color: #666;">({log.get('timestamp', '')})</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Request Details
+    cols = parent_container.columns([1, 1, 1])
+    
+    # Column 1: Request Details
+    with cols[0]:
+        st.markdown("**Request Details:**")
+        if log.get('request', {}).get('queryParams'):
+            st.markdown("*Query Parameters:*")
+            st.code(log['request']['queryParams'])
+        
+        if log.get('request', {}).get('headers'):
+            st.markdown("*Headers:*")
+            st.json(log['request']['headers'])
+        
+        if log.get('request', {}).get('body'):
+            st.markdown("*Body:*")
+            try:
+                st.json(json.loads(log['request']['body']))
+            except:
+                st.code(log['request']['body'])
+    
+    # Column 2: Response Details
+    with cols[1]:
+        st.markdown("**Response Details:**")
+        if log.get('response', {}).get('headers'):
+            st.markdown("*Headers:*")
+            st.json(log['response']['headers'])
+        
+        if log.get('response', {}).get('body'):
+            st.markdown("*Body:*")
+            try:
+                st.json(json.loads(log['response']['body']))
+            except:
+                st.code(log['response']['body'])
+    
+    # Column 3: Timing Information
+    with cols[2]:
+        if log.get('timing'):
+            st.markdown("**Timing Information:**")
+            st.json(log['timing'])
+    
+    parent_container.markdown("---")
+
+def render_console_log(log, parent_container):
+    """Renders a single console log entry with proper formatting"""
+    log_color = {
+        'error': 'red',
+        'warning': 'orange',
+        'info': 'blue',
+        'log': 'green',
+        'trace': 'gray'
+    }.get(log.get('type', 'log'), 'black')
+    
+    parent_container.markdown(f"""
+    <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+        <span style="color: {log_color};">[{log.get('type', '').upper()}]</span>
+        <span style="color: #666;">({log.get('timestamp', '')})</span><br/>
+        <strong>Message:</strong> {log.get('message', '')}<br/>
+        <small>Path: {log.get('path', '')}</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    cols = parent_container.columns([1, 1])
+    
+    # Column 1: Stack Trace
+    with cols[0]:
+        if log.get('stackTrace'):
+            st.markdown("**Stack Trace:**")
+            st.code(log['stackTrace'])
+    
+    # Column 2: Arguments
+    with cols[1]:
+        if log.get('args'):
+            st.markdown("**Arguments:**")
+            st.json(log['args'])
+    
+    parent_container.markdown("---")
+
+def render_action_result(result):
+    """Renders an action result with associated logs"""
+    # Main result
+    st.success("Action completed successfully")
+    st.json(result.get('result', {}))
+    
+    # Logs section
+    if result.get('logs'):
+        st.markdown("### Action Logs")
+        
+        # Console logs tab and Network logs tab
+        log_tabs = st.tabs(["Console Logs", "Network Logs"])
+        
+        # Console logs
+        with log_tabs[0]:
+            if result['logs'].get('console'):
+                for log in result['logs']['console']:
+                    render_console_log(log, st)
+            else:
+                st.info("No console logs available")
+        
+        # Network logs
+        with log_tabs[1]:
+            if result['logs'].get('network'):
+                for log in result['logs']['network']:
+                    render_network_log(log, st)
+            else:
+                st.info("No network logs available")
 
 def main():
     st.title("Web Browser AI-Control API Server")
@@ -398,78 +576,7 @@ def main():
                 include_logs,
                 log_filters
             )
-            
-            # Display the action result
-            st.json(result.get('result', {}))
-            
-            # If logs were included, display them in an expander
-            if include_logs and result.get('logs'):
-                with st.expander("Action Logs", expanded=True):
-                    # Display console logs
-                    if result['logs'].get('console'):
-                        st.subheader("Console Logs")
-                        for log in result['logs']['console']:
-                            log_color = {
-                                'error': 'red',
-                                'warning': 'orange',
-                                'info': 'blue',
-                                'log': 'green',
-                                'trace': 'gray'
-                            }.get(log.get('type', 'log'), 'black')
-                            
-                            st.markdown(f"""
-                            <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                                <span style="color: {log_color};">[{log.get('type', '').upper()}]</span>
-                                <span style="color: #666;">({log.get('timestamp', '')})</span><br/>
-                                <strong>Message:</strong> {log.get('message', '')}<br/>
-                                <small>Path: {log.get('path', '')}</small>
-                                {f"<details><summary>Stack Trace</summary><pre>{log.get('stackTrace', '')}</pre></details>" if log.get('stackTrace') else ""}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    
-                    # Display network logs
-                    if result['logs'].get('network'):
-                        st.subheader("Network Logs")
-                        for log in result['logs']['network']:
-                            status = log.get('status', 0)
-                            status_color = {
-                                range(100, 200): 'blue',
-                                range(200, 300): 'green',
-                                range(300, 400): 'orange',
-                                range(400, 500): 'red',
-                                range(500, 600): 'purple'
-                            }
-                            log_color = next((color for range_obj, color in status_color.items() 
-                                            if status in range_obj), 'black')
-                            
-                            st.markdown(f"""
-                            <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                                <span style="color: {log_color};">[{status}]</span> 
-                                <strong>{log.get('method', '')}</strong> {log.get('url', '')}<br/>
-                                <span style="color: #666;">({log.get('timestamp', '')})</span>
-                                
-                                {f'''
-                                <details>
-                                    <summary>Request Details</summary>
-                                    <pre>{json.dumps(log.get('request', {}), indent=2)}</pre>
-                                </details>
-                                ''' if log.get('request') else ''}
-                                
-                                {f'''
-                                <details>
-                                    <summary>Response Details</summary>
-                                    <pre>{json.dumps(log.get('response', {}), indent=2)}</pre>
-                                </details>
-                                ''' if log.get('response') else ''}
-                                
-                                {f'''
-                                <details>
-                                    <summary>Timing Information</summary>
-                                    <pre>{json.dumps(log.get('timing', {}), indent=2)}</pre>
-                                </details>
-                                ''' if log.get('timing') else ''}
-                            </div>
-                            """, unsafe_allow_html=True)
+            render_action_result(result)
     
     # Extract Data section
     st.subheader("Extract Data")
@@ -508,7 +615,9 @@ def main():
     if st.button("View DOM State"):
         with st.spinner("Fetching DOM state..."):
             result = get_dom_state(st.session_state.session_id)
-            st.code(result.get("state", ""), language="html")
+            if result.get("state"):
+                with st.expander("DOM State", expanded=True):
+                    st.code(result["state"], language="html")
     
     # Screenshot section
     st.subheader("Page Screenshot")
@@ -520,7 +629,7 @@ def main():
     
     # Logs section
     st.subheader("Logs")
-    log_type = st.radio("Log Type", ["Console", "Network"], key="log_type_radio")
+    log_type = st.radio("Log Type", ["Console", "Network"])
     
     with st.expander("Log Filters", expanded=True):
         if log_type == "Console":
@@ -528,15 +637,31 @@ def main():
             with col1:
                 truncate_length = st.number_input(
                     "Truncate Length", 
-                    value=500,
+                    value=DEFAULT_LOG_FILTERS['console']['truncateLength'],
                     step=10,
                     help="Maximum length of log messages before truncation",
                     key="console_truncate_length"
                 )
-                include_errors = st.checkbox("Include Errors", value=True, key="console_include_errors")
-                include_warnings = st.checkbox("Include Warnings", value=False, key="console_include_warnings")
-                include_info = st.checkbox("Include Info", value=False, key="console_include_info")
-                include_trace = st.checkbox("Include Trace", value=False, key="console_include_trace")
+                include_errors = st.checkbox(
+                    "Include Errors", 
+                    value=DEFAULT_LOG_FILTERS['console']['levels']['error'], 
+                    key="console_include_errors"
+                )
+                include_warnings = st.checkbox(
+                    "Include Warnings", 
+                    value=DEFAULT_LOG_FILTERS['console']['levels']['warning'], 
+                    key="console_include_warnings"
+                )
+                include_info = st.checkbox(
+                    "Include Info", 
+                    value=DEFAULT_LOG_FILTERS['console']['levels']['info'], 
+                    key="console_include_info"
+                )
+                include_trace = st.checkbox(
+                    "Include Trace", 
+                    value=DEFAULT_LOG_FILTERS['console']['levels']['trace'], 
+                    key="console_include_trace"
+                )
             
             with col2:
                 include_string_filters = st.text_area(
@@ -560,10 +685,12 @@ def main():
                     end_datetime = datetime.combine(today, end_time).isoformat() if end_time else None
 
             filters = {
-                'includeErrors': include_errors,
-                'includeWarnings': include_warnings,
-                'includeInfo': include_info,
-                'includeTrace': include_trace,
+                'levels': {
+                    'error': include_errors,
+                    'warning': include_warnings,
+                    'info': include_info,
+                    'trace': include_trace
+                },
                 'truncateLength': truncate_length,
                 'includeStringFilters': [f.strip() for f in include_string_filters.split('\n') if f.strip()],
                 'excludeStringFilters': [f.strip() for f in exclude_string_filters.split('\n') if f.strip()]
@@ -579,27 +706,67 @@ def main():
             with col1:
                 truncate_length = st.number_input(
                     "Truncate Length", 
-                    value=500,
+                    value=DEFAULT_LOG_FILTERS['network']['truncateLength'],
                     step=10,
                     help="Maximum length of request/response bodies before truncation",
                     key="network_truncate_length"
                 )
                 st.write("Status Codes:")
-                include_info = st.checkbox("1xx (Informational)", value=False, key="network_include_info")
-                include_success = st.checkbox("2xx (Success)", value=False, key="network_include_success")
-                include_redirect = st.checkbox("3xx (Redirect)", value=False, key="network_include_redirect")
-                include_client_error = st.checkbox("4xx (Client Error)", value=True, key="network_include_client_error")
-                include_server_error = st.checkbox("5xx (Server Error)", value=True, key="network_include_server_error")
+                include_info = st.checkbox(
+                    "1xx (Informational)", 
+                    value=DEFAULT_LOG_FILTERS['network']['statusCodes']['info'], 
+                    key="network_include_info"
+                )
+                include_success = st.checkbox(
+                    "2xx (Success)", 
+                    value=DEFAULT_LOG_FILTERS['network']['statusCodes']['success'], 
+                    key="network_include_success"
+                )
+                include_redirect = st.checkbox(
+                    "3xx (Redirect)", 
+                    value=DEFAULT_LOG_FILTERS['network']['statusCodes']['redirect'], 
+                    key="network_include_redirect"
+                )
+                include_client_error = st.checkbox(
+                    "4xx (Client Error)", 
+                    value=DEFAULT_LOG_FILTERS['network']['statusCodes']['clientError'], 
+                    key="network_include_client_error"
+                )
+                include_server_error = st.checkbox(
+                    "5xx (Server Error)", 
+                    value=DEFAULT_LOG_FILTERS['network']['statusCodes']['serverError'], 
+                    key="network_include_server_error"
+                )
             
             with col2:
                 st.write("Request Details:")
-                include_request_headers = st.checkbox("Include Request Headers", value=False, key="network_include_request_headers")
-                include_request_body = st.checkbox("Include Request Body", value=False, key="network_include_request_body")
-                include_request_params = st.checkbox("Include Query Parameters", value=False, key="network_include_request_params")
+                include_request_headers = st.checkbox(
+                    "Include Request Headers", 
+                    value=DEFAULT_LOG_FILTERS['network']['includeHeaders'], 
+                    key="network_include_request_headers"
+                )
+                include_request_body = st.checkbox(
+                    "Include Request Body", 
+                    value=DEFAULT_LOG_FILTERS['network']['includeBody'], 
+                    key="network_include_request_body"
+                )
+                include_request_params = st.checkbox(
+                    "Include Query Parameters", 
+                    value=DEFAULT_LOG_FILTERS['network']['includeQueryParams'], 
+                    key="network_include_request_params"
+                )
                 
                 st.write("Response Details:")
-                include_response_headers = st.checkbox("Include Response Headers", value=False, key="network_include_response_headers")
-                include_response_body = st.checkbox("Include Response Body", value=False, key="network_include_response_body")
+                include_response_headers = st.checkbox(
+                    "Include Response Headers", 
+                    value=DEFAULT_LOG_FILTERS['network']['includeHeaders'], 
+                    key="network_include_response_headers"
+                )
+                include_response_body = st.checkbox(
+                    "Include Response Body", 
+                    value=DEFAULT_LOG_FILTERS['network']['includeBody'], 
+                    key="network_include_response_body"
+                )
                 
                 include_string_filters = st.text_area(
                     "Include Strings (one per line)", 
@@ -621,98 +788,32 @@ def main():
                     'clientError': include_client_error,
                     'serverError': include_server_error
                 },
-                'request': {
-                    'includeHeaders': include_request_headers,
-                    'includeBody': include_request_body,
-                    'includeQueryParams': include_request_params
-                },
-                'response': {
-                    'includeHeaders': include_response_headers,
-                    'includeBody': include_response_body
-                },
+                'includeHeaders': include_request_headers or include_response_headers,
+                'includeBody': include_request_body or include_response_body,
+                'includeQueryParams': include_request_params,
                 'truncateLength': truncate_length,
                 'includeStringFilters': [f.strip() for f in include_string_filters.split('\n') if f.strip()],
                 'excludeStringFilters': [f.strip() for f in exclude_string_filters.split('\n') if f.strip()]
             }
 
-    if st.button("View Logs", key="view_logs_button"):
+    if st.button("View Logs"):
         with st.spinner("Fetching logs..."):
             if log_type == "Console":
-                logs = get_console_logs(st.session_state.session_id, filters)
-                
-                # Enhanced console log display
-                if logs.get('logs'):
-                    for log in logs['logs']:
-                        log_color = {
-                            'error': 'red',
-                            'warning': 'orange',
-                            'info': 'blue',
-                            'log': 'green',
-                            'trace': 'gray'
-                        }.get(log['type'], 'black')
-                        
-                        # Create expandable sections for full content
-                        st.markdown(f"""
-                        <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                            <span style="color: {log_color};">[{log['type'].upper()}]</span>
-                            <span style="color: #666;">({log['timestamp']})</span><br/>
-                            <strong>Message:</strong><br/>
-                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{log['message']}</pre>
-                            <small>Path: {log['path']}</small>
-                            {f'<details><summary>Stack Trace</summary><pre style="white-space: pre-wrap; word-wrap: break-word;">{log["stackTrace"]}</pre></details>' if log.get('stackTrace') else ''}
-                            {f'<details><summary>Arguments</summary><pre style="white-space: pre-wrap; word-wrap: break-word;">{json.dumps(log.get("args", []), indent=2)}</pre></details>' if log.get('args') else ''}
-                        </div>
-                        """, unsafe_allow_html=True)
+                result = get_console_logs(st.session_state.session_id, filters)
+                if result.get('success') and result.get('logs'):
+                    for log in result['logs']:
+                        render_console_log(log, st)
                 else:
                     st.info("No console logs found")
-            
-            else:  # Network logs
-                logs = get_network_logs(st.session_state.session_id, filters)
-                
-                # Enhanced network log display
-                if logs.get('logs'):
-                    for log in logs['logs']:
-                        status_color = {
-                            range(100, 200): 'blue',
-                            range(200, 300): 'green',
-                            range(300, 400): 'orange',
-                            range(400, 500): 'red',
-                            range(500, 600): 'purple'
-                        }
-                        log_color = next((color for range_obj, color in status_color.items() 
-                                        if log['status'] in range_obj), 'black')
-                        
-                        st.markdown(f"""
-                        <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
-                            <span style="color: {log_color};">[{log['status']}]</span> 
-                            <strong>{log['method']}</strong> {log['url']}<br/>
-                            <span style="color: #666;">({log['timestamp']})</span>
-                            
-                            <details>
-                                <summary>Request Details</summary>
-                                {f'<strong>Query Parameters:</strong><br/><pre style="white-space: pre-wrap; word-wrap: break-word;">{log["request"].get("queryParams", "")}</pre>' if log.get('request', {}).get('queryParams') else ''}
-                                {f'<strong>Headers:</strong><br/><pre style="white-space: pre-wrap; word-wrap: break-word;">{json.dumps(log["request"].get("headers", {}), indent=2)}</pre>' if log.get('request', {}).get('headers') else ''}
-                                {f'<strong>Body:</strong><br/><pre style="white-space: pre-wrap; word-wrap: break-word;">{log["request"].get("body", "")}</pre>' if log.get('request', {}).get('body') else ''}
-                            </details>
-                            
-                            <details>
-                                <summary>Response Details</summary>
-                                {f'<strong>Headers:</strong><br/><pre style="white-space: pre-wrap; word-wrap: break-word;">{json.dumps(log["response"].get("headers", {}), indent=2)}</pre>' if log.get('response', {}).get('headers') else ''}
-                                {f'<strong>Body:</strong><br/><pre style="white-space: pre-wrap; word-wrap: break-word;">{log["response"].get("body", "")}</pre>' if log.get('response', {}).get('body') else ''}
-                            </details>
-                            
-                            {f'''
-                            <details>
-                                <summary>Timing Information</summary>
-                                <pre style="white-space: pre-wrap; word-wrap: break-word;">{json.dumps(log["timing"], indent=2)}</pre>
-                            </details>
-                            ''' if log.get('timing') else ''}
-                        </div>
-                        """, unsafe_allow_html=True)
+            else:
+                result = get_network_logs(st.session_state.session_id, filters)
+                if result.get('success') and result.get('logs'):
+                    for log in result['logs']:
+                        render_network_log(log, st)
                 else:
                     st.info("No network logs found")
     
-    if st.button("Clear Logs", key="clear_logs_button"):
+    if st.button("Clear Logs"):
         with st.spinner("Clearing logs..."):
             result = clear_logs(st.session_state.session_id)
             if result.get("success"):
