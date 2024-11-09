@@ -5,7 +5,11 @@ const { z } = require('zod');
 
 // Helper function to ensure Stagehand instance exists
 async function ensureStagehand(sessionId, options = {}) {
-    return await stagehandService.getOrCreateInstance(sessionId, options);
+    try {
+        return await stagehandService.getOrCreateInstance(sessionId, options);
+    } catch (error) {
+        throw new Error(`Failed to initialize browser session: ${error.message}`);
+    }
 }
 
 /**
@@ -27,10 +31,20 @@ async function ensureStagehand(sessionId, options = {}) {
  */
 router.post('/navigate/:sessionId', async (req, res) => {
     try {
-        const stagehand = await ensureStagehand(req.params.sessionId);
         const { url } = req.body;
         if (!url) {
-            throw new Error('URL is required for navigation');
+            return res.status(400).json({ 
+                success: false,
+                error: 'URL is required for navigation'
+            });
+        }
+
+        const stagehand = await ensureStagehand(req.params.sessionId);
+        if (!stagehand?.page) {
+            return res.status(500).json({
+                success: false,
+                error: 'Browser page not initialized'
+            });
         }
 
         await stagehand.page.goto(url, {
@@ -45,6 +59,7 @@ router.post('/navigate/:sessionId', async (req, res) => {
     } catch (error) {
         console.error('Navigation error:', error);
         res.status(500).json({ 
+            success: false,
             error: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -71,7 +86,21 @@ router.post('/navigate/:sessionId', async (req, res) => {
 router.post('/act/:sessionId', async (req, res) => {
     try {
         const { action, useVision, modelName } = req.body;
+        
+        if (!action) {
+            return res.status(400).json({
+                success: false,
+                error: 'Action instruction is required'
+            });
+        }
+
         const stagehand = await ensureStagehand(req.params.sessionId, { modelName });
+        if (!stagehand) {
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to initialize browser session'
+            });
+        }
 
         const result = await stagehand.act({ 
             action,
@@ -79,9 +108,16 @@ router.post('/act/:sessionId', async (req, res) => {
             modelName
         });
 
-        res.json(result);
+        res.json({
+            success: true,
+            result
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ 
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

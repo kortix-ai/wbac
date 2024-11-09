@@ -19,9 +19,23 @@ const stagehandService = require('../services/stagehand-service');
 router.post('/create-session', async (req, res) => {
     try {
         const session = await browserbaseService.createSession();
-        res.json({ success: true, sessionId: session.id });
+        if (!session?.id) {
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to create browser session'
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            sessionId: session.id 
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
@@ -41,11 +55,32 @@ router.post('/create-session', async (req, res) => {
  */
 router.post('/stop-session/:sessionId', async (req, res) => {
     try {
-        await browserbaseService.stopSession(req.params.sessionId);
-        await stagehandService.cleanupInstance(req.params.sessionId);
+        const { sessionId } = req.params;
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Session ID is required'
+            });
+        }
+
+        const session = await browserbaseService.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                error: `Session ${sessionId} not found`
+            });
+        }
+
+        await browserbaseService.stopSession(sessionId);
+        await stagehandService.cleanupInstance(sessionId);
+        
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
