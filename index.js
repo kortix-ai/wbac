@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const sessionRoutes = require('./routes/session-routes');
 const browserRoutes = require('./routes/browser-routes');
+const sessionExpiryManager = require('./services/session-expiry-service');
 
 const app = express();
 app.use(express.json());
@@ -29,27 +30,8 @@ process.on('SIGINT', async () => {
     try {
         console.log('\nShutting down server...');
         
-        // Get browserbase service
-        const browserbaseService = require('./services/browserbase-service');
-        const stagehandService = require('./services/stagehand-service');
-        
-        // Get all running sessions
-        const sessions = await browserbaseService.listRunningSessions();
-        
-        // Stop each session
-        if (sessions && sessions.length > 0) {
-            console.log(`Cleaning up ${sessions.length} browser sessions...`);
-            
-            await Promise.all(sessions.map(async (session) => {
-                try {
-                    await browserbaseService.stopSession(session.id);
-                    await stagehandService.cleanupInstance(session.id);
-                    console.log(`Stopped session: ${session.id}`);
-                } catch (error) {
-                    console.error(`Failed to stop session ${session.id}:`, error.message);
-                }
-            }));
-        }
+        // Stop all sessions
+        await sessionExpiryManager.stopAllSessions();
         
         console.log('Cleanup complete. Exiting...');
         process.exit(0);

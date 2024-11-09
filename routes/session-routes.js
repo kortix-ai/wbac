@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const browserbaseService = require('../services/browserbase-service');
 const stagehandService = require('../services/stagehand-service');
+const sessionExpiryManager = require('../services/session-expiry-service');
 
 /**
  * @api {post} /api/sessions/create-session Create Browser Session
@@ -25,6 +26,8 @@ router.post('/create-session', async (req, res) => {
                 error: 'Failed to create browser session'
             });
         }
+
+        await sessionExpiryManager.trackSession(session.id);
 
         res.json({ 
             success: true, 
@@ -171,6 +174,43 @@ router.get('/debug/:sessionId', async (req, res) => {
             success: false,
             error: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+/**
+ * @api {post} /api/sessions/reset-expiry/:sessionId Reset Session Expiry
+ * @apiName ResetSessionExpiry
+ * @apiGroup Sessions
+ * @apiVersion 1.0.0
+ * 
+ * @apiDescription Resets the expiry timer for a specific Browserbase session.
+ * 
+ * @apiParam {String} sessionId Session's unique identifier
+ * 
+ * @apiSuccess {Boolean} success Indicates if operation was successful
+ * 
+ * @apiError (Error 500) {Object} error Error object with message
+ */
+router.post('/reset-expiry/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        
+        const isActive = await sessionExpiryManager.trackSession(sessionId);
+        if (!isActive) {
+            return res.status(404).json({
+                success: false,
+                error: 'Session not found or not running'
+            });
+        }
+
+        sessionExpiryManager.resetExpiry(sessionId);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });

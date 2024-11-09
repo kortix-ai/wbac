@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const stagehandService = require('../services/stagehand-service');
+const sessionExpiryManager = require('../services/session-expiry-service');
 const { z } = require('zod');
 
 // Helper function to ensure Stagehand instance exists
 async function ensureStagehand(sessionId, options = {}) {
     try {
+        // Reset session expiry on any browser activity
+        await sessionExpiryManager.trackSession(sessionId);
+        sessionExpiryManager.resetExpiry(sessionId);
+        
         return await stagehandService.getOrCreateInstance(sessionId, options);
     } catch (error) {
         throw new Error(`Failed to initialize browser session: ${error.message}`);
