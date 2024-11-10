@@ -4,7 +4,7 @@ const stagehandService = require('./stagehand-service');
 class SessionExpiryManager {
     constructor() {
         this.expiryTasks = new Map(); // sessionId -> timeout handle
-        this.EXPIRY_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+        this.EXPIRY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
     }
 
     async trackSession(sessionId) {

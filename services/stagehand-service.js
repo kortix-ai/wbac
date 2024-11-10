@@ -1,4 +1,4 @@
-const { Stagehand } = require('../stagehand/dist/index');
+const { Stagehand } = require('@browserbasehq/stagehand');
 
 class StagehandService {
     constructor() {
@@ -25,12 +25,7 @@ class StagehandService {
 
         this.logs.set(sessionId, {
             console: [],
-            network: [],
-            actErrors: {
-                console: [],
-                network: [],
-                actionLogs: []
-            }
+            network: []
         });
 
         await this._setupMonitoring(sessionId, stagehand, options.monitorSettings);
@@ -87,36 +82,6 @@ class StagehandService {
             } catch (error) {
                 console.error('Error logging network response:', error);
             }
-        });
-
-        stagehand.page.on('pageerror', error => {
-            sessionLogs.actErrors.console.push({
-                type: 'error',
-                message: error.message,
-                timestamp: new Date().toISOString(),
-                stackTrace: error.stack
-            });
-        });
-
-        stagehand.page.on('console', message => {
-            if (message.type() === 'error') {
-                sessionLogs.actErrors.console.push({
-                    type: 'error',
-                    message: message.text(),
-                    timestamp: new Date().toISOString(),
-                    stackTrace: message.stackTrace?.() || null
-                });
-            }
-        });
-
-        stagehand.page.on('requestfailed', request => {
-            sessionLogs.actErrors.network.push({
-                type: 'error',
-                url: request.url(),
-                method: request.method(),
-                timestamp: new Date().toISOString(),
-                errorText: request.failure()?.errorText || 'Unknown error'
-            });
         });
     }
 

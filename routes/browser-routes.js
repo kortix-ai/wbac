@@ -433,7 +433,6 @@ router.post('/clear-logs/:sessionId', (req, res) => {
 
         logs.console = [];
         logs.network = [];
-        logs.actErrors = { console: [], network: [], actionLogs: [] };
 
         res.json({ success: true });
     } catch (error) {
