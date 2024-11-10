@@ -4,6 +4,11 @@ class BrowserbaseService {
     constructor() {
         this.apiKey = process.env.BROWSERBASE_API_KEY;
         this.projectId = process.env.BROWSERBASE_PROJECT_ID;
+        
+        if (!this.apiKey || !this.projectId) {
+            throw new Error('BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID environment variables are required');
+        }
+        
         this.client = new Browserbase({ apiKey: this.apiKey });
     }
 
