@@ -17,7 +17,9 @@ class StagehandService {
             debugDom: options.debugDom || true,
             browserbaseResumeSessionID: sessionId,
             domSettleTimeoutMs: 30000,
-            enableCaching: false
+            enableCaching: false,
+            apiKey: process.env.BROWSERBASE_API_KEY,
+            projectId: process.env.BROWSERBASE_PROJECT_ID
         };
 
         const stagehand = new Stagehand(config);
